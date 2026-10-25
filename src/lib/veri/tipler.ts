@@ -82,11 +82,17 @@ export type MevzuatDegisikligi = {
   etkilenen_gruplar: string | null;
   etkilenen_tesisler: string | null;
   aksiyon: string | null;
-  durum: 'acik' | 'kapali';
+  /** oneri: otomatik taramadan geldi, onay bekliyor · reddedildi: ilgisiz bulundu (yeniden önerilmez) */
+  durum: 'oneri' | 'acik' | 'kapali' | 'reddedildi';
   mevzuat_id: string | null;
+  kaynak: 'elle' | 'excel' | 'tarama';
+  kaynak_url: string | null;
+  tarama_notu: string | null;
 };
 
-export type YeniDegisiklik = Omit<MevzuatDegisikligi, 'id' | 'durum'>;
+export type YeniDegisiklik = Omit<MevzuatDegisikligi, 'id' | 'durum' | 'kaynak' | 'kaynak_url' | 'tarama_notu'>;
+
+export type EntegrasyonAnahtari = { id: string; aktif: boolean; son_kullanim: string | null; created_at: string };
 
 export type Mevzuat = {
   id: string;
@@ -287,6 +293,10 @@ export interface Depo {
   degisiklikEkle(d: YeniDegisiklik): Promise<string>;
   degisiklikGuncelle(id: string, alanlar: Partial<Omit<MevzuatDegisikligi, 'id'>>): Promise<void>;
   sektorGruplari(): Promise<SektorGrubu[]>;
+  taramaAnahtarlari(): Promise<EntegrasyonAnahtari[]>;
+  /** Yalnızca anahtarın sha256 özeti saklanır. */
+  taramaAnahtariEkle(ozet: string): Promise<void>;
+  taramaAnahtariKapat(id: string): Promise<void>;
   mevzuatlar(): Promise<Mevzuat[]>;
   mevzuat(id: string): Promise<Mevzuat | null>;
   mevzuatEkle(m: Omit<Mevzuat, 'id'>): Promise<string>;

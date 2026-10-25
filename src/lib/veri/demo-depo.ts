@@ -82,7 +82,7 @@ export function demoDepo(): Depo {
     },
     async mevzuatDegisiklikleri() {
       return q(`select id, to_char(tespit_tarihi, 'YYYY-MM-DD') as tespit_tarihi, rg_metin, tur, ad, ozet, etkilenen_gruplar,
-                       etkilenen_tesisler, aksiyon, durum, mevzuat_id from mevzuat_degisiklikleri order by tespit_tarihi desc, created_at desc`);
+                       etkilenen_tesisler, aksiyon, durum, mevzuat_id, kaynak, kaynak_url, tarama_notu from mevzuat_degisiklikleri order by tespit_tarihi desc, created_at desc`);
     },
     async degisiklikEkle(d) {
       return (
@@ -95,6 +95,15 @@ export function demoDepo(): Depo {
     },
     async degisiklikGuncelle(id, alanlar) {
       await guncelle('mevzuat_degisiklikleri', id, alanlar);
+    },
+    async taramaAnahtarlari() {
+      return q("select id, aktif, son_kullanim, created_at from entegrasyon_anahtarlari where amac = 'mevzuat_tarama' order by created_at desc");
+    },
+    async taramaAnahtariEkle(ozet) {
+      await q("insert into entegrasyon_anahtarlari (amac, ozet) values ('mevzuat_tarama', $1)", [ozet]);
+    },
+    async taramaAnahtariKapat(id) {
+      await q('update entegrasyon_anahtarlari set aktif = false where id = $1', [id]);
     },
     async sektorGruplari() {
       return q('select kod, ad, aciklama from sektor_gruplari');
@@ -380,4 +389,13 @@ export async function demoPlanDosyasiYaz(yol: string, veri: ArrayBuffer) {
   const hedef = path.join(DOSYA_DIZINI(), 'planlar', yol);
   await mkdir(path.dirname(hedef), { recursive: true });
   await writeFile(hedef, Buffer.from(veri));
+}
+
+/** Demo modunda otomatik tarama uçları (Supabase'deki güvenlik tanımlı fonksiyonların aynısı çağrılır). */
+export async function demoTaramaRpc(ad: 'mevzuat_tarama_baglami' | 'mevzuat_tarama_kaydet', p: unknown[]) {
+  const r = await q<{ v: unknown }>(
+    ad === 'mevzuat_tarama_baglami' ? 'select mevzuat_tarama_baglami($1) as v' : 'select mevzuat_tarama_kaydet($1, $2::jsonb) as v',
+    p,
+  );
+  return r[0]?.v ?? null;
 }

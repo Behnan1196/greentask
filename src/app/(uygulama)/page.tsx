@@ -76,6 +76,7 @@ export default async function Kokpit(props: PageProps<'/'>) {
   const say = (d: string) => hepsi.filter((s) => s.sonuc.durum === d).length;
   const gecikmis = hepsi.filter((s) => s.sonuc.durum === 'gecikti');
   const acikMevzuat = degisiklikler.filter((d) => d.durum === 'acik');
+  const mevzuatOnerisi = degisiklikler.filter((d) => d.durum === 'oneri').length;
   const eksikTurleri = Object.entries(
     hepsi
       .filter((s) => s.sonuc.durum === 'veri_eksik')
@@ -223,6 +224,11 @@ export default async function Kokpit(props: PageProps<'/'>) {
         <aside className="flex min-w-0 flex-[1_1_300px] flex-col gap-4">
           <section className="flex flex-col gap-3 rounded-xl border border-cizgi bg-yuzey px-5 py-4">
             <h2 className="text-base font-semibold">Açık mevzuat değişiklikleri · {acikMevzuat.length}</h2>
+            {mevzuatOnerisi > 0 && (
+              <Link href="/mevzuat" className="rounded-lg bg-mavi-zemin px-3 py-2 text-sm font-medium text-mavi no-underline">
+                Otomatik tarama {mevzuatOnerisi} yeni öneri buldu · onay bekliyor →
+              </Link>
+            )}
             {acikMevzuat.map((d) => (
               <Link key={d.id} href={`/mevzuat?acik=${d.id}#d-${d.id}`} className="flex flex-col gap-1 rounded-lg bg-[#fbf6ee] p-3 no-underline">
                 <span className="text-xs font-semibold uppercase text-turuncu">

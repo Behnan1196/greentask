@@ -59,7 +59,7 @@ export async function degisiklikGuncelle(form: FormData) {
 
 export async function degisiklikDurumu(form: FormData) {
   const { depo } = await oturumuDogrula();
-  const durum = al(form, 'durum', /^(acik|kapali)$/, true) as 'acik' | 'kapali';
+  const durum = al(form, 'durum', /^(acik|kapali|reddedildi)$/, true) as 'acik' | 'kapali' | 'reddedildi';
   await depo.degisiklikGuncelle(al(form, 'id', UUID, true)!, { durum });
   yenile();
 }
@@ -126,5 +126,25 @@ export async function mevzuatGuncelle(form: FormData) {
     const yeni = v === 'X' || v === 'K' ? v : null;
     if ((mevcut.get(g.kod) ?? null) !== yeni) await depo.matrisAyarla(id, g.kod, yeni);
   }
+  yenile();
+}
+
+/** Otomatik tarama anahtarı üretir; anahtar yalnızca bu yanıtta görünür, veritabanına özeti yazılır. */
+export async function taramaAnahtariOlustur(): Promise<{ anahtar?: string; hata?: string }> {
+  const { depo, kullanici } = await oturumuDogrula();
+  if (kullanici.rol !== 'yonetici') return { hata: 'Yalnızca yönetici anahtar oluşturabilir' };
+  const ham = new Uint8Array(24);
+  crypto.getRandomValues(ham);
+  const anahtar = `gtm_${Buffer.from(ham).toString('base64url')}`;
+  const ozet = Buffer.from(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(anahtar))).toString('hex');
+  await depo.taramaAnahtariEkle(ozet);
+  yenile();
+  return { anahtar };
+}
+
+export async function taramaAnahtariKapat(form: FormData) {
+  const { depo, kullanici } = await oturumuDogrula();
+  if (kullanici.rol !== 'yonetici') throw new Error('Yalnızca yönetici');
+  await depo.taramaAnahtariKapat(al(form, 'id', UUID, true)!);
   yenile();
 }

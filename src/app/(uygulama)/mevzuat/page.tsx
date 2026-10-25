@@ -3,8 +3,9 @@ import Link from 'next/link';
 import { etkilenenTesisler, mevzuatiBul } from '@/lib/mevzuat/etki';
 import { trTarih } from '@/lib/termin/tarih';
 import { oturumuDogrula } from '@/lib/veri/depo';
-import type { Gorev, Kullanici, MatrisHucresi, Mevzuat, MevzuatDegisikligi, SektorGrubu, Tesis } from '@/lib/veri/tipler';
-import { degisiklikDurumu, degisiklikEkle, degisiklikGuncelle, etkiGorevleriAc, mevzuatEkle } from './eylemler';
+import type { EntegrasyonAnahtari, Gorev, Kullanici, MatrisHucresi, Mevzuat, MevzuatDegisikligi, SektorGrubu, Tesis } from '@/lib/veri/tipler';
+import { AnahtarUretici } from './anahtar';
+import { degisiklikDurumu, degisiklikEkle, degisiklikGuncelle, etkiGorevleriAc, mevzuatEkle, taramaAnahtariKapat } from './eylemler';
 import { ANA, DegisiklikAlanlari, GIRDI, MevzuatAlanlari, grupSirasi } from './formlar';
 
 export const metadata: Metadata = { title: 'Mevzuat' };
@@ -35,11 +36,18 @@ function DegisiklikKarti({
   const gorevi = new Map(gorevler.map((g) => [g.tesis_id, g]));
   const biten = gorevler.filter((g) => g.durum === 'tamamlandi' || g.durum === 'iptal').length;
   const kutuphane = mevzuatiBul(d, mevzuatlar);
-  const acikDegil = d.durum === 'kapali';
+  const acikDegil = d.durum !== 'acik';
+  const oneri = d.durum === 'oneri';
+  const ROZET = {
+    oneri: { ad: 'Onay bekliyor', sinif: 'bg-mavi-zemin text-mavi' },
+    acik: { ad: 'Açık', sinif: 'bg-turuncu-zemin text-turuncu' },
+    kapali: { ad: 'Kapandı', sinif: 'bg-gri-zemin text-gri' },
+    reddedildi: { ad: 'İlgisiz', sinif: 'bg-gri-zemin text-soluk' },
+  }[d.durum];
   return (
     <article
       id={`d-${d.id}`}
-      className={`flex scroll-mt-6 flex-col gap-3 rounded-xl bg-yuzey px-5 py-4 ${vurgulu ? 'border-2 border-yesil' : 'border border-cizgi'} ${acikDegil ? 'opacity-75' : ''}`}
+      className={`flex scroll-mt-6 flex-col gap-3 rounded-xl bg-yuzey px-5 py-4 ${vurgulu ? 'border-2 border-yesil' : 'border border-cizgi'} ${acikDegil && !oneri ? 'opacity-75' : ''}`}
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex min-w-0 flex-[1_1_360px] flex-col gap-1">
@@ -53,21 +61,47 @@ function DegisiklikKarti({
               <span className="font-medium">Yapılacak:</span> {d.aksiyon}
             </p>
           )}
-          {kutuphane && (
-            <Link href={`/mevzuat/${kutuphane.id}`} className="text-xs no-underline">
-              Kütüphanede: {kutuphane.ad} →
-            </Link>
+          {d.tarama_notu && (
+            <p className="text-sm text-murekkep-2">
+              <span className="font-medium">Tarama notu:</span> {d.tarama_notu}
+            </p>
           )}
+          <span className="flex flex-wrap gap-x-3 text-xs">
+            {d.kaynak_url && (
+              <a href={d.kaynak_url} target="_blank" rel="noopener noreferrer" className="no-underline">
+                Kaynak ↗
+              </a>
+            )}
+            {kutuphane && (
+              <Link href={`/mevzuat/${kutuphane.id}`} className="no-underline">
+                Kütüphanede: {kutuphane.ad} →
+              </Link>
+            )}
+            {d.kaynak === 'tarama' && <span className="text-soluk">otomatik taramadan</span>}
+          </span>
         </div>
         <div className="flex flex-col items-end gap-2">
-          <span className={`rounded-md px-2 py-0.5 text-xs font-semibold ${acikDegil ? 'bg-gri-zemin text-gri' : 'bg-turuncu-zemin text-turuncu'}`}>
-            {acikDegil ? 'Kapandı' : 'Açık'}
-          </span>
-          <form action={degisiklikDurumu}>
-            <input type="hidden" name="id" value={d.id} />
-            <input type="hidden" name="durum" value={acikDegil ? 'acik' : 'kapali'} />
-            <button className={KUCUK}>{acikDegil ? 'Yeniden aç' : 'Kapat'}</button>
-          </form>
+          <span className={`rounded-md px-2 py-0.5 text-xs font-semibold ${ROZET.sinif}`}>{ROZET.ad}</span>
+          {oneri ? (
+            <div className="flex gap-1.5">
+              <form action={degisiklikDurumu}>
+                <input type="hidden" name="id" value={d.id} />
+                <input type="hidden" name="durum" value="acik" />
+                <button className={`${KUCUK} border-yesil text-yesil-koyu`}>Takibe al</button>
+              </form>
+              <form action={degisiklikDurumu}>
+                <input type="hidden" name="id" value={d.id} />
+                <input type="hidden" name="durum" value="reddedildi" />
+                <button className={KUCUK}>İlgisiz</button>
+              </form>
+            </div>
+          ) : (
+            <form action={degisiklikDurumu}>
+              <input type="hidden" name="id" value={d.id} />
+              <input type="hidden" name="durum" value={acikDegil ? 'acik' : 'kapali'} />
+              <button className={KUCUK}>{acikDegil ? 'Yeniden aç' : 'Kapat'}</button>
+            </form>
+          )}
         </div>
       </div>
 
@@ -158,8 +192,10 @@ function DegisiklikKarti({
 
 function Takip({ veri, acikId }: { veri: Veri; acikId?: string }) {
   const { degisiklikler, gorevler } = veri;
+  const oneriler = degisiklikler.filter((d) => d.durum === 'oneri');
   const acik = degisiklikler.filter((d) => d.durum === 'acik');
   const kapali = degisiklikler.filter((d) => d.durum === 'kapali');
+  const ilgisiz = degisiklikler.filter((d) => d.durum === 'reddedildi');
   const kart = (d: MevzuatDegisikligi) => (
     <DegisiklikKarti key={d.id} d={d} {...veri} gorevler={gorevler.filter((g) => g.mevzuat_degisikligi_id === d.id)} vurgulu={d.id === acikId} />
   );
@@ -172,6 +208,15 @@ function Takip({ veri, acikId }: { veri: Veri; acikId?: string }) {
           <button className={`${ANA} justify-self-start`}>Kaydet</button>
         </form>
       </details>
+      {oneriler.length > 0 && (
+        <>
+          <h2 className="text-lg font-semibold">Onay bekleyen öneriler · {oneriler.length}</h2>
+          <p className="-mt-2 text-sm text-murekkep-2">
+            Otomatik tarama bunları ilgili buldu. Resmî Gazete’den doğrulayıp “Takibe al” deyin; etkilenen gruplar yanlışsa önce “Düzenle”den düzeltin.
+          </p>
+          {oneriler.map(kart)}
+        </>
+      )}
       <h2 className="text-lg font-semibold">Açık değişiklikler · {acik.length}</h2>
       {acik.map(kart)}
       {!acik.length && <p className="text-sm text-soluk">Açık değişiklik yok.</p>}
@@ -181,7 +226,51 @@ function Takip({ veri, acikId }: { veri: Veri; acikId?: string }) {
           <div className="mt-3 flex flex-col gap-3">{kapali.map(kart)}</div>
         </details>
       )}
+      {ilgisiz.length > 0 && (
+        <details className="flex flex-col gap-3">
+          <summary className="cursor-pointer text-base font-semibold">İlgisiz bulunan öneriler · {ilgisiz.length}</summary>
+          <div className="mt-3 flex flex-col gap-3">{ilgisiz.map(kart)}</div>
+        </details>
+      )}
+      <TaramaKutusu anahtarlar={veri.anahtarlar} yonetici={veri.yonetici} son={degisiklikler.find((d) => d.kaynak === 'tarama')} />
     </div>
+  );
+}
+
+function TaramaKutusu({ anahtarlar, yonetici, son }: { anahtarlar: EntegrasyonAnahtari[]; yonetici: boolean; son?: MevzuatDegisikligi }) {
+  const aktif = anahtarlar.filter((a) => a.aktif);
+  const kullanim = aktif.map((a) => a.son_kullanim).filter(Boolean).sort().at(-1);
+  return (
+    <details className="rounded-xl border border-cizgi bg-yuzey px-5 py-4">
+      <summary className="cursor-pointer text-base font-semibold">
+        Otomatik tarama{' '}
+        <span className="text-sm font-normal text-soluk">
+          · {aktif.length ? (kullanim ? `son çalışma ${new Date(kullanim).toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul', dateStyle: 'short', timeStyle: 'short' })}` : 'henüz çalışmadı') : 'kurulmadı'}
+        </span>
+      </summary>
+      <div className="mt-3 flex flex-col gap-3 text-sm text-murekkep-2">
+        <p>
+          Zamanlanmış bir görev her sabah Resmî Gazete özetlerini tarar, sektör gruplarınızı ilgilendirenleri buraya “Onay bekleyen öneri” olarak yazar.
+          Tarama anahtarı yalnızca öneri ekleyebilir; takibe alma ve görev açma sizde kalır.
+          {son && ` Son öneri: ${trTarih(son.tespit_tarihi)}.`}
+        </p>
+        {aktif.map((a) => (
+          <div key={a.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-[#f7f8f5] px-3 py-2">
+            <span>
+              Anahtar · oluşturma {trTarih(new Date(a.created_at).toISOString().slice(0, 10))}
+              {a.son_kullanim ? ` · son kullanım ${trTarih(new Date(a.son_kullanim).toISOString().slice(0, 10))}` : ' · kullanılmadı'}
+            </span>
+            {yonetici && (
+              <form action={taramaAnahtariKapat}>
+                <input type="hidden" name="id" value={a.id} />
+                <button className={KUCUK}>İptal et</button>
+              </form>
+            )}
+          </div>
+        ))}
+        {yonetici ? <AnahtarUretici /> : <p className="text-soluk">Anahtarı yönetici oluşturur.</p>}
+      </div>
+    </details>
   );
 }
 
@@ -312,13 +401,16 @@ type Veri = {
   tesisler: Tesis[];
   gorevler: Gorev[];
   adi: Map<string, string>;
+  anahtarlar: EntegrasyonAnahtari[];
+  yonetici: boolean;
 };
 
 export default async function MevzuatSayfasi(props: PageProps<'/mevzuat'>) {
-  const { depo } = await oturumuDogrula();
+  const { depo, kullanici } = await oturumuDogrula();
   const sp = await props.searchParams;
   const sekme = sp.sekme === 'kutuphane' ? 'kutuphane' : 'takip';
-  const [degisiklikler, mevzuatlar, matris, gruplar, tesisler, gorevler, ekip] = await Promise.all([
+  const yonetici = kullanici.rol === 'yonetici';
+  const [degisiklikler, mevzuatlar, matris, gruplar, tesisler, gorevler, ekip, anahtarlar] = await Promise.all([
     depo.mevzuatDegisiklikleri(),
     depo.mevzuatlar(),
     depo.mevzuatMatrisi(),
@@ -326,6 +418,7 @@ export default async function MevzuatSayfasi(props: PageProps<'/mevzuat'>) {
     depo.tesisler(),
     depo.gorevler({}),
     depo.kullanicilar(),
+    yonetici ? depo.taramaAnahtarlari() : Promise.resolve([]),
   ]);
   const veri: Veri = {
     degisiklikler,
@@ -335,8 +428,11 @@ export default async function MevzuatSayfasi(props: PageProps<'/mevzuat'>) {
     tesisler,
     gorevler: gorevler.filter((g) => g.mevzuat_degisikligi_id),
     adi: new Map(ekip.map((k: Kullanici) => [k.id, k.ad_soyad])),
+    anahtarlar,
+    yonetici,
   };
   const acikSayisi = degisiklikler.filter((d) => d.durum === 'acik').length;
+  const oneriSayisi = degisiklikler.filter((d) => d.durum === 'oneri').length;
 
   return (
     <div className="flex flex-col gap-6">
@@ -349,7 +445,7 @@ export default async function MevzuatSayfasi(props: PageProps<'/mevzuat'>) {
       </header>
       <nav aria-label="Mevzuat bölümleri" className="flex gap-2">
         {[
-          { kod: 'takip', ad: 'Değişiklik takibi', alt: `${acikSayisi} açık` },
+          { kod: 'takip', ad: 'Değişiklik takibi', alt: `${acikSayisi} açık${oneriSayisi ? ` · ${oneriSayisi} öneri onay bekliyor` : ''}` },
           { kod: 'kutuphane', ad: 'Kütüphane', alt: `${mevzuatlar.length} mevzuat` },
         ].map((s) => (
           <Link

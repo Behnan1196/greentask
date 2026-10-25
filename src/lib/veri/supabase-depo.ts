@@ -55,6 +55,17 @@ export function supabaseDepo(db: Istemci): Depo {
     async degisiklikGuncelle(id, alanlar) {
       hataKontrol(await db.from('mevzuat_degisiklikleri').update(alanlar).eq('id', id).select('id').single());
     },
+    async taramaAnahtarlari() {
+      return hataKontrol(
+        await db.from('entegrasyon_anahtarlari').select('id, aktif, son_kullanim, created_at').eq('amac', 'mevzuat_tarama').order('created_at', { ascending: false }),
+      );
+    },
+    async taramaAnahtariEkle(ozet) {
+      hataKontrol(await db.from('entegrasyon_anahtarlari').insert({ amac: 'mevzuat_tarama', ozet }).select('id').single());
+    },
+    async taramaAnahtariKapat(id) {
+      hataKontrol(await db.from('entegrasyon_anahtarlari').update({ aktif: false }).eq('id', id).select('id').single());
+    },
     async sektorGruplari() {
       return hataKontrol(await db.from('sektor_gruplari').select('kod, ad, aciklama'));
     },

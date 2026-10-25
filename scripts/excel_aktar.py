@@ -618,9 +618,9 @@ class Aktarici:
         for mid, g, v in self.matris:
             o.append(f"insert into public.mevzuat_matrisi (mevzuat_id, grup_kod, uygulama) values ({sql(mid)}, {sql(g)}, {sql(v)}) on conflict do nothing;")
         for d in self.degisiklikler:
-            o.append("insert into public.mevzuat_degisiklikleri (id, tespit_tarihi, rg_metin, tur, ad, ozet, etkilenen_gruplar, etkilenen_tesisler, aksiyon, durum) values "
+            o.append("insert into public.mevzuat_degisiklikleri (id, tespit_tarihi, rg_metin, tur, ad, ozet, etkilenen_gruplar, etkilenen_tesisler, aksiyon, durum, kaynak) values "
                      f"({sql(d['id'])}, {sql(d['tespit_tarihi'])}, {sql(d['rg_metin'])}, {sql(d['tur'])}, {sql(d['ad'])}, {sql(d['ozet'])}, "
-                     f"{sql(d['etkilenen_gruplar'])}, {sql(d['etkilenen_tesisler'])}, {sql(d['aksiyon'])}, {sql(d['durum'])}) on conflict (id) do nothing;")
+                     f"{sql(d['etkilenen_gruplar'])}, {sql(d['etkilenen_tesisler'])}, {sql(d['aksiyon'])}, {sql(d['durum'])}, 'excel') on conflict do nothing;")
         o.append("\ncommit;\n")
         return "\n".join(o)
 

@@ -117,7 +117,7 @@ Ayrıntılar: [docs/KURAL_KATALOGU.md](docs/KURAL_KATALOGU.md).
 - [ ] Müşteri hatırlatma e-postaları (onaylı gönderim)
 - [ ] Belge tasnifi (büro bilgisayarında klasör tarayıcı → Supabase'e özet)
 - [x] Mevzuat: değişiklik takibi (etkilenen tesisler gruptan/koddan çözülür, tesis başına görev), kütüphane ve sektör grubu matrisi, tesis kartında uygulanan mevzuat
-- [ ] Mevzuat: Resmî Gazete taramasının sonuçlarını doğrudan "Değişiklik takibi"ne yazması
+- [x] Mevzuat: otomatik Resmî Gazete taraması → onay bekleyen öneriler ([docs/MEVZUAT_TARAMASI.md](docs/MEVZUAT_TARAMASI.md))
 - [x] Saha ziyaretleri: otomatik hazırlık listesi, fotoğraf (tarayıcıda küçültülür) / sesli not / PDF yükleme, bulgular → görev, yazdırılabilir rapor
 - [x] İşletme planı: Word sürümleri, plan haritası (bölüm/tablo/şekil, durum ve notlar sürümler arasında korunur), hata taraması (dizin, numaralandırma, mükerrer başlık, firma unvanı, eski veri, yazım, hesap), revizyon maddeleri → görev
 - [ ] İşletme planı: veri tablolarını izleme kayıtlarından üretme, sıfırdan plan şablonu
