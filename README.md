@@ -111,5 +111,5 @@ Ayrıntılar: [docs/KURAL_KATALOGU.md](docs/KURAL_KATALOGU.md).
 - [ ] Müşteri hatırlatma e-postaları (onaylı gönderim)
 - [ ] Belge tasnifi (büro bilgisayarında klasör tarayıcı → Supabase'e özet)
 - [ ] Mevzuat takip ekranı (mevcut tarama görevinin sonuçlarını buraya yazması)
-- [ ] Saha ziyareti ve rapor
+- [x] Saha ziyaretleri: otomatik hazırlık listesi, fotoğraf (tarayıcıda küçültülür) / sesli not / PDF yükleme, bulgular → görev, yazdırılabilir rapor
 - [ ] İşletme planı modülü

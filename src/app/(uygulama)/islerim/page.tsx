@@ -51,7 +51,7 @@ function TerminKarti({ s }: { s: TerminSatiri }) {
 export default async function BenimIslerim() {
   const { depo, kullanici } = await oturumuDogrula();
   const gun = bugun();
-  const [tesisler, turler, kayitlar, olaylar, gorevler, ekip, anahtar] = await Promise.all([
+  const [tesisler, turler, kayitlar, olaylar, gorevler, ekip, anahtar, ziyaretler] = await Promise.all([
     depo.tesisler(),
     depo.turler(),
     depo.yukumlulukler(),
@@ -59,7 +59,11 @@ export default async function BenimIslerim() {
     depo.gorevler({ sorumluId: kullanici.id, acik: true }),
     depo.kullanicilar(),
     depo.takvimAnahtari(),
+    depo.ziyaretler(),
   ]);
+  const ziyaretlerim = ziyaretler
+    .filter((z) => z.ziyaretci_id === kullanici.id && (z.durum === 'planli' || z.durum === 'yapildi'))
+    .sort((a, b) => a.tarih.localeCompare(b.tarih));
   const hepsi = terminleriHesapla(kayitlar, turler, tesisler, olaylar, gun);
   const benim = hepsi.filter((s) => sorumlusu(s) === kullanici.id);
   const atanmamis = hepsi.filter((s) => !sorumlusu(s) && ['gecikti', 'acil', 'yaklasiyor'].includes(s.sonuc.durum)).length;
@@ -113,6 +117,22 @@ export default async function BenimIslerim() {
         </section>
 
         <aside className="flex min-w-0 flex-[1_1_320px] flex-col gap-4">
+          {ziyaretlerim.length > 0 && (
+            <section className="flex flex-col gap-2 rounded-xl border border-cizgi bg-yuzey px-5 py-4">
+              <h2 className="text-base font-semibold">Saha ziyaretlerim · {ziyaretlerim.length}</h2>
+              {ziyaretlerim.map((z) => {
+                const t = tesisler.find((x) => x.id === z.tesis_id);
+                return (
+                  <Link key={z.id} href={`/saha/${z.id}`} className="flex justify-between gap-2 text-sm no-underline">
+                    <span>
+                      <span className="font-mono text-xs text-soluk">{trTarih(z.tarih)}</span> {t?.kisa_ad}
+                    </span>
+                    <span className="text-xs text-soluk">{z.durum === 'yapildi' ? 'rapor bekliyor' : z.amac}</span>
+                  </Link>
+                );
+              })}
+            </section>
+          )}
           <section className="flex flex-col gap-3 rounded-xl border border-cizgi bg-yuzey px-5 py-4">
             <h2 className="text-base font-semibold">Görevlerim · {gorevler.length}</h2>
             {gorevler.length ? (

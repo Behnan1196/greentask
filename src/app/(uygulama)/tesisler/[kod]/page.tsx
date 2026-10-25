@@ -6,6 +6,7 @@ import type { KuralTipi } from '@/lib/termin/motor';
 import { bugun, trTarih } from '@/lib/termin/tarih';
 import { oturumuDogrula } from '@/lib/veri/depo';
 import { terminleriHesapla, type TerminSatiri } from '@/lib/veri/terminler';
+import { ZIYARET_DURUMU } from '@/lib/saha/durum';
 import type { Kullanici } from '@/lib/veri/tipler';
 import { olayEkle, olaySil, tesisSorumlusuKaydet, yukumlulukKaydet } from './eylemler';
 
@@ -167,11 +168,12 @@ export default async function TesisKarti(props: PageProps<'/tesisler/[kod]'>) {
   const tesis = await depo.tesis(decodeURIComponent(kod));
   if (!tesis) notFound();
 
-  const [turler, kayitlar, kisiler, ekip] = await Promise.all([
+  const [turler, kayitlar, kisiler, ekip, ziyaretler] = await Promise.all([
     depo.turler(),
     depo.yukumlulukler(tesis.id),
     depo.kisiler(tesis.id),
     depo.kullanicilar(),
+    depo.ziyaretler({ tesisId: tesis.id }),
   ]);
   const olaylar = await depo.olaylar(kayitlar.map((k) => k.id));
   const terminler = terminleriHesapla(kayitlar, turler, [tesis], olaylar, bugun());
@@ -240,6 +242,21 @@ export default async function TesisKarti(props: PageProps<'/tesisler/[kod]'>) {
               <button className={`${BUTON} border border-[#c9cec6] bg-white`}>Kaydet</button>
             </form>
             <p className="text-xs text-soluk">Bu tesisin tüm yükümlülükleri, ayrıca başka biri seçilmedikçe bu kişinin işlerine düşer.</p>
+          </section>
+          <section className="flex flex-col gap-2 rounded-xl border border-cizgi bg-yuzey px-5 py-4">
+            <div className="flex items-baseline justify-between">
+              <h2 className="text-base font-semibold">Saha ziyaretleri</h2>
+              <Link href={`/saha?tesis=${tesis.id}`} className="text-sm no-underline">
+                + Planla
+              </Link>
+            </div>
+            {ziyaretler.slice(0, 4).map((z) => (
+              <Link key={z.id} href={`/saha/${z.id}`} className="flex justify-between gap-2 text-sm no-underline">
+                <span>{trTarih(z.tarih)}</span>
+                <span className="text-soluk">{ZIYARET_DURUMU[z.durum].ad}</span>
+              </Link>
+            ))}
+            {!ziyaretler.length && <p className="text-sm text-soluk">Kayıtlı ziyaret yok.</p>}
           </section>
           <section className="flex flex-col gap-3.5 rounded-xl border border-cizgi bg-yuzey px-5 py-4">
             <h2 className="text-base font-semibold">Tesis yetkilileri</h2>

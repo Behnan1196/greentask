@@ -131,6 +131,46 @@ export type ToplantiMaddesi = {
 export type YeniMadde = Pick<ToplantiMaddesi, 'toplanti_id' | 'baslik' | 'kaynak'> &
   Partial<Pick<ToplantiMaddesi, 'karar' | 'tesis_id' | 'tesis_yukumluluk_id'>>;
 
+export type ZiyaretDurumu = 'planli' | 'yapildi' | 'raporlandi' | 'iptal';
+
+export type SahaZiyareti = {
+  id: string;
+  tesis_id: string;
+  tarih: string;
+  ziyaretci_id: string | null;
+  amac: string | null;
+  durum: ZiyaretDurumu;
+  saha_notu: string | null;
+  rapor_ozeti: string | null;
+};
+
+export type BulguOnemi = 'yuksek' | 'orta' | 'dusuk' | 'uygun';
+
+export type ZiyaretBulgusu = {
+  id: string;
+  ziyaret_id: string;
+  bulgu: string;
+  dayanak: string | null;
+  onem: BulguOnemi;
+  duzeltici_faaliyet: string | null;
+  termin: string | null;
+  durum: 'acik' | 'kapandi';
+  gorev_id: string | null;
+  dosya_id: string | null;
+  sira: number;
+};
+
+export type ZiyaretDosyasi = {
+  id: string;
+  ziyaret_id: string;
+  tur: 'foto' | 'ses' | 'belge';
+  yol: string;
+  mime: string;
+  boyut: number;
+  aciklama: string | null;
+  created_at: string;
+};
+
 export type GorevFiltresi = { sorumluId?: string; acik?: boolean; toplantiId?: string; toplantidan?: boolean };
 
 /** Takvim aboneliği için oturumsuz okunan veri paketi. */
@@ -159,7 +199,7 @@ export interface Depo {
   kullanicilar(): Promise<Kullanici[]>;
   tesisSorumlusuAta(tesisId: string, kullaniciId: string | null): Promise<void>;
   gorevler(filtre: GorevFiltresi): Promise<Gorev[]>;
-  gorevEkle(g: YeniGorev): Promise<void>;
+  gorevEkle(g: YeniGorev): Promise<string>;
   toplantilar(): Promise<Toplanti[]>;
   toplanti(id: string): Promise<Toplanti | null>;
   toplantiOlustur(t: Pick<Toplanti, 'tarih' | 'baslik'>): Promise<string>;
@@ -170,4 +210,17 @@ export interface Depo {
   maddeSil(id: string): Promise<void>;
   gorevDurumu(id: string, durum: GorevDurumu): Promise<void>;
   takvimAnahtari(yenile?: boolean): Promise<string>;
+  ziyaretler(filtre?: { tesisId?: string }): Promise<SahaZiyareti[]>;
+  ziyaret(id: string): Promise<SahaZiyareti | null>;
+  ziyaretOlustur(z: Pick<SahaZiyareti, 'tesis_id' | 'tarih' | 'ziyaretci_id' | 'amac'>): Promise<string>;
+  ziyaretGuncelle(id: string, alanlar: Partial<Omit<SahaZiyareti, 'id' | 'tesis_id'>>): Promise<void>;
+  bulgular(ziyaretIdleri: string[]): Promise<ZiyaretBulgusu[]>;
+  bulguEkle(b: Omit<ZiyaretBulgusu, 'id' | 'sira' | 'durum' | 'gorev_id'>): Promise<void>;
+  bulguGuncelle(id: string, alanlar: Partial<Pick<ZiyaretBulgusu, 'durum' | 'gorev_id'>>): Promise<void>;
+  bulguSil(id: string): Promise<void>;
+  dosyalar(ziyaretId: string): Promise<ZiyaretDosyasi[]>;
+  dosya(id: string): Promise<ZiyaretDosyasi | null>;
+  dosyaKaydet(d: Omit<ZiyaretDosyasi, 'id' | 'created_at'>, veri: ArrayBuffer): Promise<void>;
+  dosyaIcerigi(yol: string): Promise<ArrayBuffer>;
+  dosyaSil(id: string): Promise<void>;
 }

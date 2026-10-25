@@ -68,7 +68,9 @@ export function supabaseDepo(db: Istemci): Depo {
       return hataKontrol(await q);
     },
     async gorevEkle(g) {
-      hataKontrol(await db.from('gorevler').insert({ kaynak: 'elle', ...g }).select('id').single());
+      const r = await db.from('gorevler').insert({ kaynak: 'elle', ...g }).select('id').single();
+      if (r.error) throw new Error(`Veritabanı hatası: ${r.error.message}`);
+      return (r.data as { id: string }).id;
     },
     async toplantilar() {
       return hataKontrol(await db.from('toplantilar').select('*').order('tarih', { ascending: false }));
@@ -97,6 +99,62 @@ export function supabaseDepo(db: Istemci): Depo {
     },
     async maddeSil(id) {
       hataKontrol(await db.from('toplanti_maddeleri').delete().eq('id', id).select('id').single());
+    },
+    async ziyaretler(filtre = {}) {
+      let q = db.from('saha_ziyaretleri').select('*').order('tarih', { ascending: false });
+      if (filtre.tesisId) q = q.eq('tesis_id', filtre.tesisId);
+      return hataKontrol(await q);
+    },
+    async ziyaret(id) {
+      return hataKontrol(await db.from('saha_ziyaretleri').select('*').eq('id', id).maybeSingle());
+    },
+    async ziyaretOlustur(z) {
+      const r = await db.from('saha_ziyaretleri').insert(z).select('id').single();
+      if (r.error) throw new Error(`Veritabanı hatası: ${r.error.message}`);
+      return (r.data as { id: string }).id;
+    },
+    async ziyaretGuncelle(id, alanlar) {
+      hataKontrol(await db.from('saha_ziyaretleri').update(alanlar).eq('id', id).select('id').single());
+    },
+    async bulgular(idler) {
+      if (!idler.length) return [];
+      return hataKontrol(await db.from('ziyaret_bulgulari').select('*').in('ziyaret_id', idler).order('sira').order('created_at'));
+    },
+    async bulguEkle(b) {
+      const son = await db.from('ziyaret_bulgulari').select('sira').eq('ziyaret_id', b.ziyaret_id).order('sira', { ascending: false }).limit(1);
+      const sira = ((son.data?.[0] as { sira: number } | undefined)?.sira ?? 0) + 1;
+      hataKontrol(await db.from('ziyaret_bulgulari').insert({ ...b, sira }).select('id').single());
+    },
+    async bulguGuncelle(id, alanlar) {
+      hataKontrol(await db.from('ziyaret_bulgulari').update(alanlar).eq('id', id).select('id').single());
+    },
+    async bulguSil(id) {
+      hataKontrol(await db.from('ziyaret_bulgulari').delete().eq('id', id).select('id').single());
+    },
+    async dosyalar(ziyaretId) {
+      return hataKontrol(await db.from('ziyaret_dosyalari').select('*').eq('ziyaret_id', ziyaretId).order('created_at'));
+    },
+    async dosya(id) {
+      return hataKontrol(await db.from('ziyaret_dosyalari').select('*').eq('id', id).maybeSingle());
+    },
+    async dosyaKaydet(d, veri) {
+      const y = await db.storage.from('saha').upload(d.yol, veri, { contentType: d.mime, upsert: false });
+      if (y.error) throw new Error(`Dosya yüklenemedi: ${y.error.message}`);
+      const r = await db.from('ziyaret_dosyalari').insert(d).select('id').single();
+      if (r.error) {
+        await db.storage.from('saha').remove([d.yol]);
+        throw new Error(`Veritabanı hatası: ${r.error.message}`);
+      }
+    },
+    async dosyaIcerigi(yol) {
+      const r = await db.storage.from('saha').download(yol);
+      if (r.error || !r.data) throw new Error(`Dosya okunamadı: ${r.error?.message}`);
+      return r.data.arrayBuffer();
+    },
+    async dosyaSil(id) {
+      const d = hataKontrol(await db.from('ziyaret_dosyalari').select('yol').eq('id', id).single()) as { yol: string };
+      hataKontrol(await db.from('ziyaret_dosyalari').delete().eq('id', id).select('id').single());
+      await db.storage.from('saha').remove([d.yol]);
     },
     async gorevDurumu(id, durum) {
       const tamamlanma_zamani = durum === 'tamamlandi' ? new Date().toISOString() : null;

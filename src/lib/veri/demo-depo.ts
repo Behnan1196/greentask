@@ -1,4 +1,6 @@
 import 'server-only';
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import path from 'node:path';
 import { Pool } from 'pg';
 import type { Depo, Kullanici, TakvimVerisi } from './tipler';
 
@@ -32,6 +34,19 @@ const TESIS = ['id', 'gt_kod', 'kisa_ad', 'resmi_unvan', 'il', 'sinif', 'nace_ko
   'sozlesme_tarihi', 'sozlesme_kapsami', 'izin_lisans_konusu', 'mevzuat_notu', 'notlar', 'aktif', 'sorumlu_id'];
 const GOREV = "g.id, g.baslik, g.aciklama, g.sorumlu_id, to_char(g.son_tarih, 'YYYY-MM-DD') as son_tarih, g.durum, g.kaynak, g.tesis_id, g.toplanti_id, g.toplanti_maddesi_id, g.created_at";
 const TOPLANTI = "id, to_char(tarih, 'YYYY-MM-DD') as tarih, baslik, notlar, durum, created_at";
+const ZIYARET = "id, tesis_id, to_char(tarih, 'YYYY-MM-DD') as tarih, ziyaretci_id, amac, durum, saha_notu, rapor_ozeti";
+const BULGU = "id, ziyaret_id, bulgu, dayanak, onem, duzeltici_faaliyet, to_char(termin, 'YYYY-MM-DD') as termin, durum, gorev_id, dosya_id, sira";
+const DOSYA_DIZINI = () => process.env.GT_DEMO_DOSYA_DIZINI ?? '/tmp/gt-demo-dosyalar';
+
+function guncelle(tablo: string, id: string, alanlar: object) {
+  const k = Object.keys(alanlar);
+  if (!k.length) return Promise.resolve([]);
+  return q(`update ${tablo} set ${k.map((a, i) => `${a} = $${i + 2}`).join(', ')} where id = $1`, [
+    id,
+    ...k.map((a) => (alanlar as Record<string, unknown>)[a]),
+  ]);
+}
+
 const TY = ['id', 'tesis_id', 'tur_id', 'etiket', 'durum', 'gecerlilik_bitis', 'belge_tarihi', 'son_islem', 'baslangic',
   'parametreler', 'sorumlu_id', 'notlar'];
 
@@ -97,10 +112,11 @@ export function demoDepo(): Depo {
       );
     },
     async gorevEkle(g) {
-      await q(
-        'insert into gorevler (baslik, aciklama, sorumlu_id, son_tarih, tesis_id, kaynak, toplanti_id, toplanti_maddesi_id) values ($1, $2, $3, $4, $5, $6, $7, $8)',
+      const r = await q<{ id: string }>(
+        'insert into gorevler (baslik, aciklama, sorumlu_id, son_tarih, tesis_id, kaynak, toplanti_id, toplanti_maddesi_id) values ($1, $2, $3, $4, $5, $6, $7, $8) returning id',
         [g.baslik, g.aciklama, g.sorumlu_id, g.son_tarih, g.tesis_id, g.kaynak ?? 'elle', g.toplanti_id ?? null, g.toplanti_maddesi_id ?? null],
       );
+      return r[0].id;
     },
     async toplantilar() {
       return q(`select ${TOPLANTI} from toplantilar order by tarih desc, created_at desc`);
@@ -133,6 +149,63 @@ export function demoDepo(): Depo {
     },
     async maddeSil(id) {
       await q('delete from toplanti_maddeleri where id = $1', [id]);
+    },
+    async ziyaretler(filtre = {}) {
+      return filtre.tesisId
+        ? q(`select ${ZIYARET} from saha_ziyaretleri where tesis_id = $1 order by tarih desc`, [filtre.tesisId])
+        : q(`select ${ZIYARET} from saha_ziyaretleri order by tarih desc`);
+    },
+    async ziyaret(id) {
+      return (await q<never>(`select ${ZIYARET} from saha_ziyaretleri where id = $1`, [id]))[0] ?? null;
+    },
+    async ziyaretOlustur(z) {
+      return (
+        await q<{ id: string }>('insert into saha_ziyaretleri (tesis_id, tarih, ziyaretci_id, amac) values ($1, $2, $3, $4) returning id', [
+          z.tesis_id, z.tarih, z.ziyaretci_id, z.amac,
+        ])
+      )[0].id;
+    },
+    async ziyaretGuncelle(id, alanlar) {
+      await guncelle('saha_ziyaretleri', id, alanlar);
+    },
+    async bulgular(idler) {
+      if (!idler.length) return [];
+      return q(`select ${BULGU} from ziyaret_bulgulari where ziyaret_id = any($1::uuid[]) order by sira, created_at`, [idler]);
+    },
+    async bulguEkle(b) {
+      await q(
+        `insert into ziyaret_bulgulari (ziyaret_id, bulgu, dayanak, onem, duzeltici_faaliyet, termin, dosya_id, sira)
+         values ($1, $2, $3, $4, $5, $6, $7, coalesce((select max(sira) from ziyaret_bulgulari where ziyaret_id = $1), 0) + 1)`,
+        [b.ziyaret_id, b.bulgu, b.dayanak, b.onem, b.duzeltici_faaliyet, b.termin, b.dosya_id],
+      );
+    },
+    async bulguGuncelle(id, alanlar) {
+      await guncelle('ziyaret_bulgulari', id, alanlar);
+    },
+    async bulguSil(id) {
+      await q('delete from ziyaret_bulgulari where id = $1', [id]);
+    },
+    async dosyalar(ziyaretId) {
+      return q('select * from ziyaret_dosyalari where ziyaret_id = $1 order by created_at', [ziyaretId]);
+    },
+    async dosya(id) {
+      return (await q<never>('select * from ziyaret_dosyalari where id = $1', [id]))[0] ?? null;
+    },
+    async dosyaKaydet(d, veri) {
+      const hedef = path.join(DOSYA_DIZINI(), d.yol);
+      await mkdir(path.dirname(hedef), { recursive: true });
+      await writeFile(hedef, Buffer.from(veri));
+      await q('insert into ziyaret_dosyalari (ziyaret_id, tur, yol, mime, boyut, aciklama) values ($1, $2, $3, $4, $5, $6)', [
+        d.ziyaret_id, d.tur, d.yol, d.mime, d.boyut, d.aciklama,
+      ]);
+    },
+    async dosyaIcerigi(yol) {
+      const b = await readFile(path.join(DOSYA_DIZINI(), yol));
+      return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer;
+    },
+    async dosyaSil(id) {
+      const r = await q<{ yol: string }>('delete from ziyaret_dosyalari where id = $1 returning yol', [id]);
+      if (r[0]) await rm(path.join(DOSYA_DIZINI(), r[0].yol), { force: true });
     },
     async gorevDurumu(id, durum) {
       await q("update gorevler set durum = $2::gorev_durumu, tamamlanma_zamani = case when $2::text = 'tamamlandi' then now() else null end where id = $1", [id, durum]);
