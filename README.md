@@ -77,6 +77,14 @@ Bundan sonra `main` dalına her `git push` otomatik yayına alınır; diğer dal
 Çalışanlara davet gidebilmesi için **Project Settings → Authentication → SMTP Settings** ile kendi SMTP'nizi tanımlayın
 (örn. Resend, Brevo ya da şirket e-postası).
 
+## Güncellemeleri yayına alma
+Yeni bir sürümde `supabase/migrations/` altına yeni dosya geldiyse **önce veritabanını, sonra kodu** güncelleyin:
+```bash
+npx supabase db push      # yeni migration'ları uygular (seed'i yeniden yüklemez)
+git push                  # Vercel yeni kodu yayına alır
+```
+Sıra tersine olursa yeni kod, henüz var olmayan sütunları sorgulayıp hata verir.
+
 ## Supabase'siz deneme (demo modu)
 Yerel bir Postgres'e şema ve veri yüklenip `.env.local` içine `GT_DEMO_DB_URL=postgresql://…` yazılırsa uygulama oturum açmadan o veritabanıyla çalışır.
 Bu mod yalnızca geliştirme içindir; production derlemesinde devre dışıdır.
@@ -98,7 +106,7 @@ Ayrıntılar: [docs/KURAL_KATALOGU.md](docs/KURAL_KATALOGU.md).
 
 ## Yol haritası
 - [x] Şema, RLS, Excel aktarımı, kural motoru, Kokpit, Tesis kartı
-- [ ] Benim İşlerim (sorumlu atama, kişisel takvim, takvim aboneliği)
+- [x] Benim İşlerim: tesis/yükümlülük sorumlusu, elle görev, kişisel takvim aboneliği (.ics)
 - [ ] Toplantı & Görevler
 - [ ] Müşteri hatırlatma e-postaları (onaylı gönderim)
 - [ ] Belge tasnifi (büro bilgisayarında klasör tarayıcı → Supabase'e özet)

@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { DurumRozeti, KalanGun, RiskEtiketi } from '@/components/rozetler';
 import { bugun, trTarih, trUzunTarih } from '@/lib/termin/tarih';
 import { oturumuDogrula } from '@/lib/veri/depo';
-import { riskli, terminleriHesapla, type TerminSatiri } from '@/lib/veri/terminler';
+import { riskli, sorumlusu, terminleriHesapla, type TerminSatiri } from '@/lib/veri/terminler';
 
 export const metadata: Metadata = { title: 'Kokpit' };
 
@@ -47,21 +47,31 @@ function Kart({ baslik, deger, alt, renk }: { baslik: string; deger: number; alt
 }
 
 export default async function Kokpit(props: PageProps<'/'>) {
-  const { depo } = await oturumuDogrula();
+  const { depo, kullanici } = await oturumuDogrula();
   const sp = await props.searchParams;
+  const kim = typeof sp.kim === 'string' ? sp.kim : '';
   const filtre = (FILTRELER.find((f) => f.kod === sp.filtre)?.kod ?? 'oncelikli') as Filtre;
   const turSecimi = typeof sp.tur === 'string' && sp.tur ? sp.tur : undefined;
 
   const gun = bugun();
-  const [tesisler, turler, kayitlar, olaylar, degisiklikler] = await Promise.all([
+  const [tesisler, turler, kayitlar, olaylar, degisiklikler, ekip] = await Promise.all([
     depo.tesisler(),
     depo.turler(),
     depo.yukumlulukler(),
     depo.olaylar(),
     depo.mevzuatDegisiklikleri(),
+    depo.kullanicilar(),
   ]);
+  const adi = new Map(ekip.map((k) => [k.id, k.ad_soyad]));
   const hepsi = terminleriHesapla(kayitlar, turler, tesisler, olaylar, gun);
-  const satirlar = filtrele(hepsi, filtre, turSecimi);
+  const kimeGore = (s: TerminSatiri) => {
+    const k = sorumlusu(s);
+    if (kim === 'ben') return k === kullanici.id;
+    if (kim === 'atanmamis') return !k;
+    if (kim) return k === kim;
+    return true;
+  };
+  const satirlar = filtrele(hepsi, filtre, turSecimi).filter(kimeGore);
 
   const say = (d: string) => hepsi.filter((s) => s.sonuc.durum === d).length;
   const gecikmis = hepsi.filter((s) => s.sonuc.durum === 'gecikti');
@@ -79,6 +89,7 @@ export default async function Kokpit(props: PageProps<'/'>) {
     const q = new URLSearchParams();
     if (f !== 'oncelikli') q.set('filtre', f);
     if (t) q.set('tur', t);
+    if (kim) q.set('kim', kim);
     const s = q.toString();
     return s ? `/?${s}` : '/';
   };
@@ -118,7 +129,7 @@ export default async function Kokpit(props: PageProps<'/'>) {
                 </Link>
               ))}
             </div>
-            <form className="flex items-center gap-2" action="/">
+            <form className="flex flex-wrap items-center gap-2" action="/">
               {filtre !== 'oncelikli' && <input type="hidden" name="filtre" value={filtre} />}
               <label htmlFor="tur" className="text-sm text-soluk">
                 Tür
@@ -131,11 +142,24 @@ export default async function Kokpit(props: PageProps<'/'>) {
                   </option>
                 ))}
               </select>
+              <label htmlFor="kim" className="text-sm text-soluk">
+                Sorumlu
+              </label>
+              <select id="kim" name="kim" defaultValue={kim} className="min-h-9 rounded-lg border border-[#c9cec6] bg-white px-2 text-sm">
+                <option value="">Herkes</option>
+                <option value="ben">Benimkiler</option>
+                <option value="atanmamis">Atanmamış</option>
+                {ekip.map((k) => (
+                  <option key={k.id} value={k.id}>
+                    {k.ad_soyad}
+                  </option>
+                ))}
+              </select>
               <button className="min-h-9 rounded-lg border border-[#c9cec6] bg-white px-3 text-sm">Uygula</button>
             </form>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[760px] border-collapse text-sm">
+            <table className="w-full min-w-[860px] border-collapse text-sm">
               <thead>
                 <tr className="text-left text-xs uppercase tracking-wide text-soluk">
                   <th className="px-5 py-2.5 font-medium">Aksiyona kalan</th>
@@ -143,6 +167,7 @@ export default async function Kokpit(props: PageProps<'/'>) {
                   <th className="px-3 py-2.5 font-medium">Yükümlülük</th>
                   <th className="px-3 py-2.5 font-medium">Aksiyon</th>
                   <th className="px-3 py-2.5 font-medium">Son tarih</th>
+                  <th className="px-3 py-2.5 font-medium">Sorumlu</th>
                   <th className="px-5 py-2.5 font-medium">Risk</th>
                 </tr>
               </thead>
@@ -176,6 +201,7 @@ export default async function Kokpit(props: PageProps<'/'>) {
                       {s.kayit.notlar && <span className="block text-xs text-soluk">{s.kayit.notlar}</span>}
                     </td>
                     <td className="px-3 py-3 font-mono text-xs">{trTarih(s.sonuc.sonTarih)}</td>
+                    <td className="px-3 py-3 text-murekkep-2">{adi.get(sorumlusu(s) ?? '') ?? <span className="text-soluk">—</span>}</td>
                     <td className="px-5 py-3">
                       <RiskEtiketi risk={s.tur.cezai_risk} />
                     </td>
@@ -183,7 +209,7 @@ export default async function Kokpit(props: PageProps<'/'>) {
                 ))}
                 {!satirlar.length && (
                   <tr>
-                    <td colSpan={6} className="px-5 py-8 text-center text-soluk">
+                    <td colSpan={7} className="px-5 py-8 text-center text-soluk">
                       Bu filtrede kayıt yok.
                     </td>
                   </tr>

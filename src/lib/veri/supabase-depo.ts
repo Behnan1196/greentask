@@ -53,5 +53,39 @@ export function supabaseDepo(db: Istemci): Depo {
     async olaySil(id) {
       hataKontrol(await db.from('yukumluluk_olaylari').delete().eq('id', id).select('id').single());
     },
+    async kullanicilar() {
+      return hataKontrol(await db.from('profiller').select('id, ad_soyad, eposta, rol').eq('aktif', true).order('ad_soyad'));
+    },
+    async tesisSorumlusuAta(tesisId, kullaniciId) {
+      hataKontrol(await db.from('tesisler').update({ sorumlu_id: kullaniciId }).eq('id', tesisId).select('id').single());
+    },
+    async gorevler({ sorumluId, acik }) {
+      let q = db.from('gorevler').select('*').order('son_tarih', { ascending: true, nullsFirst: false });
+      if (sorumluId) q = q.eq('sorumlu_id', sorumluId);
+      if (acik) q = q.in('durum', ['acik', 'devam']);
+      return hataKontrol(await q);
+    },
+    async gorevEkle(g) {
+      hataKontrol(await db.from('gorevler').insert({ ...g, kaynak: 'elle' }).select('id').single());
+    },
+    async gorevDurumu(id, durum) {
+      const tamamlanma_zamani = durum === 'tamamlandi' ? new Date().toISOString() : null;
+      hataKontrol(await db.from('gorevler').update({ durum, tamamlanma_zamani }).eq('id', id).select('id').single());
+    },
+    async takvimAnahtari(yenile = false) {
+      const { data: u } = await db.auth.getUser();
+      if (!u.user) throw new Error('Oturum yok');
+      if (!yenile) {
+        const mevcut = await db.from('takvim_anahtarlari').select('anahtar').eq('kullanici_id', u.user.id).maybeSingle();
+        if (mevcut.data) return mevcut.data.anahtar;
+      }
+      const r = await db
+        .from('takvim_anahtarlari')
+        .upsert({ kullanici_id: u.user.id, anahtar: crypto.randomUUID() })
+        .select('anahtar')
+        .single();
+      if (r.error) throw new Error(`Veritabanı hatası: ${r.error.message}`);
+      return (r.data as { anahtar: string }).anahtar;
+    },
   };
 }

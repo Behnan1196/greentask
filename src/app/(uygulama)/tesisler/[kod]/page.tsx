@@ -6,7 +6,8 @@ import type { KuralTipi } from '@/lib/termin/motor';
 import { bugun, trTarih } from '@/lib/termin/tarih';
 import { oturumuDogrula } from '@/lib/veri/depo';
 import { terminleriHesapla, type TerminSatiri } from '@/lib/veri/terminler';
-import { olayEkle, olaySil, yukumlulukKaydet } from './eylemler';
+import type { Kullanici } from '@/lib/veri/tipler';
+import { olayEkle, olaySil, tesisSorumlusuKaydet, yukumlulukKaydet } from './eylemler';
 
 export async function generateMetadata(props: PageProps<'/tesisler/[kod]'>): Promise<Metadata> {
   const { kod } = await props.params;
@@ -34,7 +35,9 @@ const TARIH_ALANLARI: Record<KuralTipi, { ad: 'gecerlilik_bitis' | 'belge_tarihi
 const GIRDI = 'min-h-10 rounded-lg border border-[#c9cec6] bg-white px-2.5 text-sm';
 const BUTON = 'min-h-10 rounded-lg px-4 text-sm';
 
-function YukumlulukSatiri({ s, gtKod }: { s: TerminSatiri; gtKod: string }) {
+function YukumlulukSatiri({ s, gtKod, ekip }: { s: TerminSatiri; gtKod: string; ekip: Kullanici[] }) {
+  const tesisSorumlusu = ekip.find((k) => k.id === s.tesis?.sorumlu_id);
+  const kayitSorumlusu = ekip.find((k) => k.id === s.kayit.sorumlu_id);
   const alanlar = [...TARIH_ALANLARI[s.tur.kural_tipi]];
   if (s.tur.kural_tipi === 'bitis_tarihi' && s.tur.parametreler.gecerlilik_ay) {
     alanlar.push({ ad: 'belge_tarihi', etiket: `Belge tarihi (+${s.tur.parametreler.gecerlilik_ay} ay)` });
@@ -48,6 +51,7 @@ function YukumlulukSatiri({ s, gtKod }: { s: TerminSatiri; gtKod: string }) {
           <span className="block text-xs text-soluk">
             <RiskEtiketi risk={s.tur.cezai_risk} /> risk{s.tur.hedef_klasor ? ` · ${s.tur.hedef_klasor}` : ''}
           </span>
+          {kayitSorumlusu && <span className="block text-xs text-mavi">Sorumlu: {kayitSorumlusu.ad_soyad}</span>}
         </span>
         <span className="font-mono text-xs leading-6">
           {s.sonuc.sonTarih ? `Son: ${trTarih(s.sonuc.sonTarih)}` : '—'}
@@ -85,6 +89,17 @@ function YukumlulukSatiri({ s, gtKod }: { s: TerminSatiri; gtKod: string }) {
               <option value="beklemede">Beklemede (henüz lisans yok vb.)</option>
               <option value="muaf">Muaf</option>
               <option value="kapsam_disi">Kapsam dışı</option>
+            </select>
+          </label>
+          <label className="flex flex-col gap-1 text-sm">
+            Sorumlu
+            <select name="sorumlu_id" defaultValue={s.kayit.sorumlu_id ?? ''} className={GIRDI}>
+              <option value="">Tesis sorumlusu{tesisSorumlusu ? ` (${tesisSorumlusu.ad_soyad})` : ' (atanmamış)'}</option>
+              {ekip.map((k) => (
+                <option key={k.id} value={k.id}>
+                  {k.ad_soyad}
+                </option>
+              ))}
             </select>
           </label>
           <label className="flex flex-col gap-1 text-sm">
@@ -152,7 +167,12 @@ export default async function TesisKarti(props: PageProps<'/tesisler/[kod]'>) {
   const tesis = await depo.tesis(decodeURIComponent(kod));
   if (!tesis) notFound();
 
-  const [turler, kayitlar, kisiler] = await Promise.all([depo.turler(), depo.yukumlulukler(tesis.id), depo.kisiler(tesis.id)]);
+  const [turler, kayitlar, kisiler, ekip] = await Promise.all([
+    depo.turler(),
+    depo.yukumlulukler(tesis.id),
+    depo.kisiler(tesis.id),
+    depo.kullanicilar(),
+  ]);
   const olaylar = await depo.olaylar(kayitlar.map((k) => k.id));
   const terminler = terminleriHesapla(kayitlar, turler, [tesis], olaylar, bugun());
   const takipte = terminler.filter((s) => ['muaf', 'kapsam_disi'].indexOf(s.sonuc.durum) < 0);
@@ -188,19 +208,39 @@ export default async function TesisKarti(props: PageProps<'/tesisler/[kod]'>) {
             <span className="text-xs text-soluk">Satıra tıklayınca tarihleri ve geçmişi düzenleyebilirsiniz</span>
           </div>
           {takipte.map((s) => (
-            <YukumlulukSatiri key={s.kayit.id} s={s} gtKod={tesis.gt_kod} />
+            <YukumlulukSatiri key={s.kayit.id} s={s} gtKod={tesis.gt_kod} ekip={ekip} />
           ))}
           {disarida.length > 0 && (
             <>
               <h2 className="border-t border-cizgi px-5 pb-1 pt-4 text-sm font-semibold text-soluk">Muaf / kapsam dışı · {disarida.length}</h2>
               {disarida.map((s) => (
-                <YukumlulukSatiri key={s.kayit.id} s={s} gtKod={tesis.gt_kod} />
+                <YukumlulukSatiri key={s.kayit.id} s={s} gtKod={tesis.gt_kod} ekip={ekip} />
               ))}
             </>
           )}
         </section>
 
         <aside className="flex min-w-0 flex-[1_1_280px] flex-col gap-4">
+          <section className="flex flex-col gap-2.5 rounded-xl border border-cizgi bg-yuzey px-5 py-4">
+            <h2 className="text-base font-semibold">Greentask sorumlusu</h2>
+            <form action={tesisSorumlusuKaydet} className="flex flex-wrap gap-2">
+              <input type="hidden" name="tesis_id" value={tesis.id} />
+              <input type="hidden" name="gt_kod" value={tesis.gt_kod} />
+              <label htmlFor="tesis-sorumlu" className="sr-only">
+                Tesis sorumlusu
+              </label>
+              <select id="tesis-sorumlu" name="sorumlu_id" defaultValue={tesis.sorumlu_id ?? ''} className={`${GIRDI} min-w-0 flex-1`}>
+                <option value="">Atanmamış</option>
+                {ekip.map((k) => (
+                  <option key={k.id} value={k.id}>
+                    {k.ad_soyad}
+                  </option>
+                ))}
+              </select>
+              <button className={`${BUTON} border border-[#c9cec6] bg-white`}>Kaydet</button>
+            </form>
+            <p className="text-xs text-soluk">Bu tesisin tüm yükümlülükleri, ayrıca başka biri seçilmedikçe bu kişinin işlerine düşer.</p>
+          </section>
           <section className="flex flex-col gap-3.5 rounded-xl border border-cizgi bg-yuzey px-5 py-4">
             <h2 className="text-base font-semibold">Tesis yetkilileri</h2>
             {kisiler.map((k) => (

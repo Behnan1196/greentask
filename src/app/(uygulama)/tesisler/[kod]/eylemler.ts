@@ -8,6 +8,15 @@ import type { YukumlulukGuncelleme } from '@/lib/veri/tipler';
 const DURUMLAR: KayitDurumu[] = ['aktif', 'muaf', 'kapsam_disi', 'beklemede'];
 const OLAYLAR: OlayTuru[] = ['gerceklesti', 'sunuldu', 'eksiklik_geldi', 'eksiklik_yanitlandi', 'onaylandi', 'not'];
 const TARIH = /^\d{4}-\d{2}-\d{2}$/;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** '' → null (atanmamış / tesis sorumlusuna bırak), geçersiz değer → hata. */
+function kullaniciAlani(form: FormData, ad: string): string | null {
+  const v = String(form.get(ad) ?? '').trim();
+  if (!v) return null;
+  if (!UUID.test(v)) throw new Error('Geçersiz kullanıcı');
+  return v;
+}
 
 function tarihAlani(form: FormData, ad: string): string | null | undefined {
   if (!form.has(ad)) return undefined;
@@ -21,6 +30,7 @@ function yenile(form: FormData) {
   const kod = String(form.get('gt_kod') ?? '');
   revalidatePath('/');
   revalidatePath('/tesisler');
+  revalidatePath('/islerim');
   if (kod) revalidatePath(`/tesisler/${kod}`);
 }
 
@@ -30,7 +40,11 @@ export async function yukumlulukKaydet(form: FormData) {
   const durum = String(form.get('durum') ?? '') as KayitDurumu;
   if (!id || !DURUMLAR.includes(durum)) throw new Error('Geçersiz istek');
 
-  const alanlar: YukumlulukGuncelleme = { durum, notlar: String(form.get('notlar') ?? '').trim() || null };
+  const alanlar: YukumlulukGuncelleme = {
+    durum,
+    notlar: String(form.get('notlar') ?? '').trim() || null,
+    sorumlu_id: kullaniciAlani(form, 'sorumlu_id'),
+  };
   for (const a of ['gecerlilik_bitis', 'belge_tarihi', 'son_islem', 'baslangic'] as const) {
     const v = tarihAlani(form, a);
     if (v !== undefined) alanlar[a] = v;
@@ -54,5 +68,13 @@ export async function olaySil(form: FormData) {
   const id = String(form.get('id') ?? '');
   if (!id) throw new Error('Geçersiz istek');
   await depo.olaySil(id);
+  yenile(form);
+}
+
+export async function tesisSorumlusuKaydet(form: FormData) {
+  const { depo } = await oturumuDogrula();
+  const tesisId = String(form.get('tesis_id') ?? '');
+  if (!UUID.test(tesisId)) throw new Error('Geçersiz istek');
+  await depo.tesisSorumlusuAta(tesisId, kullaniciAlani(form, 'sorumlu_id'));
   yenile(form);
 }

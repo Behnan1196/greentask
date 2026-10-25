@@ -1,11 +1,17 @@
 import 'server-only';
 import { Pool } from 'pg';
-import type { Depo, Kullanici } from './tipler';
+import type { Depo, Kullanici, TakvimVerisi } from './tipler';
 
 // YALNIZCA GELİŞTİRME: Supabase hesabı olmadan, Excel'den üretilen seed ile yüklü yerel bir
 // Postgres üzerinde uygulamayı denemek için. Oturum açma yoktur; production'da asla kullanılmaz.
 
 const DEMO_KULLANICI: Kullanici = { id: '00000000-0000-0000-0000-000000000000', ad_soyad: 'Demo kullanıcı', eposta: null, rol: 'yonetici' };
+
+/** Demo kullanıcı: veritabanındaki ilk yönetici (yoksa sahte kullanıcı). */
+async function demoKullanici(): Promise<Kullanici> {
+  const r = await q<Kullanici>("select id, ad_soyad, eposta, rol from profiller where aktif and rol = 'yonetici' order by created_at limit 1");
+  return r[0] ?? DEMO_KULLANICI;
+}
 
 let havuz: Pool | null = null;
 function pool() {
@@ -14,7 +20,7 @@ function pool() {
   return havuz;
 }
 
-const TARIH_ALANLARI = ['tarih', 'tespit_tarihi', 'gecerlilik_bitis', 'belge_tarihi', 'son_islem', 'baslangic', 'sozlesme_tarihi'];
+const TARIH_ALANLARI = ['son_tarih', 'tarih', 'tespit_tarihi', 'gecerlilik_bitis', 'belge_tarihi', 'son_islem', 'baslangic', 'sozlesme_tarihi'];
 const tarihSql = (tablo: string, sutunlar: string[]) =>
   sutunlar.map((s) => (TARIH_ALANLARI.includes(s) ? `to_char(${tablo}.${s}, 'YYYY-MM-DD') as ${s}` : `${tablo}.${s}`)).join(', ');
 
@@ -23,14 +29,15 @@ async function q<T>(sql: string, p: unknown[] = []): Promise<T[]> {
 }
 
 const TESIS = ['id', 'gt_kod', 'kisa_ad', 'resmi_unvan', 'il', 'sinif', 'nace_kodlari', 'grup_kod', 'grup_notu', 'firma_grubu',
-  'sozlesme_tarihi', 'sozlesme_kapsami', 'izin_lisans_konusu', 'mevzuat_notu', 'notlar', 'aktif'];
+  'sozlesme_tarihi', 'sozlesme_kapsami', 'izin_lisans_konusu', 'mevzuat_notu', 'notlar', 'aktif', 'sorumlu_id'];
+const GOREV = "g.id, g.baslik, g.aciklama, g.sorumlu_id, to_char(g.son_tarih, 'YYYY-MM-DD') as son_tarih, g.durum, g.kaynak, g.tesis_id, g.toplanti_id, g.created_at";
 const TY = ['id', 'tesis_id', 'tur_id', 'etiket', 'durum', 'gecerlilik_bitis', 'belge_tarihi', 'son_islem', 'baslangic',
   'parametreler', 'sorumlu_id', 'notlar'];
 
 export function demoDepo(): Depo {
   return {
     async kullanici() {
-      return DEMO_KULLANICI;
+      return demoKullanici();
     },
     async tesisler() {
       return q(`select ${tarihSql('t', TESIS)} from tesisler t where aktif order by gt_kod`);
@@ -70,5 +77,47 @@ export function demoDepo(): Depo {
     async olaySil(id) {
       await q('delete from yukumluluk_olaylari where id = $1', [id]);
     },
+    async kullanicilar() {
+      return q('select id, ad_soyad, eposta, rol from profiller where aktif order by ad_soyad');
+    },
+    async tesisSorumlusuAta(tesisId, kullaniciId) {
+      await q('update tesisler set sorumlu_id = $2 where id = $1', [tesisId, kullaniciId]);
+    },
+    async gorevler({ sorumluId, acik }) {
+      const kosul: string[] = [];
+      const p: unknown[] = [];
+      if (sorumluId) kosul.push(`sorumlu_id = $${p.push(sorumluId)}`);
+      if (acik) kosul.push("durum in ('acik', 'devam')");
+      return q(
+        `select ${GOREV} from gorevler g ${kosul.length ? 'where ' + kosul.join(' and ') : ''} order by son_tarih nulls last, created_at`,
+        p,
+      );
+    },
+    async gorevEkle(g) {
+      await q("insert into gorevler (baslik, aciklama, sorumlu_id, son_tarih, tesis_id, kaynak) values ($1, $2, $3, $4, $5, 'elle')", [
+        g.baslik, g.aciklama, g.sorumlu_id, g.son_tarih, g.tesis_id,
+      ]);
+    },
+    async gorevDurumu(id, durum) {
+      await q("update gorevler set durum = $2, tamamlanma_zamani = case when $2 = 'tamamlandi' then now() else null end where id = $1", [id, durum]);
+    },
+    async takvimAnahtari(yenile = false) {
+      const k = await demoKullanici();
+      if (!yenile) {
+        const r = await q<{ anahtar: string }>('select anahtar from takvim_anahtarlari where kullanici_id = $1', [k.id]);
+        if (r[0]) return r[0].anahtar;
+      }
+      const r = await q<{ anahtar: string }>(
+        'insert into takvim_anahtarlari (kullanici_id) values ($1) on conflict (kullanici_id) do update set anahtar = gen_random_uuid() returning anahtar',
+        [k.id],
+      );
+      return r[0].anahtar;
+    },
   };
+}
+
+/** Demo modunda takvim aboneliği verisi (Supabase'deki takvim_verisi fonksiyonunun karşılığı). */
+export async function demoTakvimVerisi(anahtar: string): Promise<TakvimVerisi | null> {
+  const r = await q<{ v: TakvimVerisi | null }>('select takvim_verisi($1::uuid) as v', [anahtar]);
+  return r[0]?.v ?? null;
 }

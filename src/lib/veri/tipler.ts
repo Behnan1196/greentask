@@ -21,6 +21,7 @@ export type Tesis = {
   mevzuat_notu: string | null;
   notlar: string | null;
   aktif: boolean;
+  sorumlu_id: string | null;
 };
 
 export type Kisi = {
@@ -85,8 +86,35 @@ export type MevzuatDegisikligi = {
 };
 
 export type YukumlulukGuncelleme = Partial<
-  Pick<TesisYukumlulukSatiri, 'durum' | 'gecerlilik_bitis' | 'belge_tarihi' | 'son_islem' | 'baslangic' | 'notlar'>
+  Pick<TesisYukumlulukSatiri, 'durum' | 'gecerlilik_bitis' | 'belge_tarihi' | 'son_islem' | 'baslangic' | 'notlar' | 'sorumlu_id'>
 >;
+
+export type GorevDurumu = 'acik' | 'devam' | 'tamamlandi' | 'iptal';
+
+export type Gorev = {
+  id: string;
+  baslik: string;
+  aciklama: string | null;
+  sorumlu_id: string | null;
+  son_tarih: string | null;
+  durum: GorevDurumu;
+  kaynak: string;
+  tesis_id: string | null;
+  toplanti_id: string | null;
+  created_at: string;
+};
+
+export type YeniGorev = Pick<Gorev, 'baslik' | 'aciklama' | 'sorumlu_id' | 'son_tarih' | 'tesis_id'>;
+
+/** Takvim aboneliği için oturumsuz okunan veri paketi. */
+export type TakvimVerisi = {
+  kullanici: { id: string; ad_soyad: string };
+  tesisler: Tesis[];
+  turler: YukumlulukTuruSatiri[];
+  kayitlar: TesisYukumlulukSatiri[];
+  olaylar: OlaySatiri[];
+  gorevler: Gorev[];
+};
 
 /** Veri erişim katmanı: Supabase (gerçek) ve yerel Postgres (yalnızca geliştirme/demo) aynı arayüzü uygular. */
 export interface Depo {
@@ -101,4 +129,10 @@ export interface Depo {
   yukumlulukGuncelle(id: string, alanlar: YukumlulukGuncelleme): Promise<void>;
   olayEkle(o: Omit<OlaySatiri, 'id'>): Promise<void>;
   olaySil(id: string): Promise<void>;
+  kullanicilar(): Promise<Kullanici[]>;
+  tesisSorumlusuAta(tesisId: string, kullaniciId: string | null): Promise<void>;
+  gorevler(filtre: { sorumluId?: string; acik?: boolean }): Promise<Gorev[]>;
+  gorevEkle(g: YeniGorev): Promise<void>;
+  gorevDurumu(id: string, durum: GorevDurumu): Promise<void>;
+  takvimAnahtari(yenile?: boolean): Promise<string>;
 }

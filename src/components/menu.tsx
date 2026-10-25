@@ -5,10 +5,11 @@ import { usePathname } from 'next/navigation';
 
 const BAGLANTILAR = [
   { href: '/', ad: 'Kokpit' },
+  { href: '/islerim', ad: 'Benim İşlerim' },
   { href: '/tesisler', ad: 'Tesisler' },
 ];
 
-const YAKINDA = ['Benim İşlerim', 'Belge Tasnifi', 'Mevzuat', 'Toplantı & Görevler', 'Saha Ziyaretleri', 'İşletme Planları'];
+const YAKINDA = ['Belge Tasnifi', 'Mevzuat', 'Toplantı & Görevler', 'Saha Ziyaretleri', 'İşletme Planları'];
 
 export function Menu() {
   const yol = usePathname();

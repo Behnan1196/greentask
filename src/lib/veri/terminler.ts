@@ -53,4 +53,7 @@ export function terminleriHesapla(
   );
 }
 
+/** Etkin sorumlu: kayıtta seçilmişse o, yoksa tesisin sorumlusu. */
+export const sorumlusu = (s: TerminSatiri) => s.kayit.sorumlu_id ?? s.tesis?.sorumlu_id ?? null;
+
 export const riskli = (s: TerminSatiri) => s.tur.cezai_risk === 'var' || s.tur.cezai_risk === 'yuksek';
