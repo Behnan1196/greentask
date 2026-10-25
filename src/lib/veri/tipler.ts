@@ -102,11 +102,13 @@ export type Gorev = {
   tesis_id: string | null;
   toplanti_id: string | null;
   toplanti_maddesi_id: string | null;
+  isletme_plani_id: string | null;
+  plan_ogesi_id: string | null;
   created_at: string;
 };
 
 export type YeniGorev = Pick<Gorev, 'baslik' | 'aciklama' | 'sorumlu_id' | 'son_tarih' | 'tesis_id'> &
-  Partial<Pick<Gorev, 'toplanti_id' | 'toplanti_maddesi_id' | 'kaynak'>>;
+  Partial<Pick<Gorev, 'toplanti_id' | 'toplanti_maddesi_id' | 'kaynak' | 'isletme_plani_id' | 'plan_ogesi_id'>>;
 
 export type Toplanti = {
   id: string;
@@ -171,7 +173,76 @@ export type ZiyaretDosyasi = {
   created_at: string;
 };
 
-export type GorevFiltresi = { sorumluId?: string; acik?: boolean; toplantiId?: string; toplantidan?: boolean };
+export type GorevFiltresi = { sorumluId?: string; acik?: boolean; toplantiId?: string; toplantidan?: boolean; isletmePlaniId?: string };
+
+export type PlanDurumu = 'taslak' | 'revizyonda' | 'sunuldu' | 'onaylandi';
+
+export type IsletmePlani = {
+  id: string;
+  baslik: string;
+  durum: PlanDurumu;
+  onayli_surum: string | null;
+  onay_tarihi: string | null;
+  sunum_tarihi: string | null;
+  hazirlayan_id: string | null;
+  notlar: string | null;
+  tesis_idleri: string[];
+  created_at: string;
+};
+
+export type PlanAlanlari = Omit<IsletmePlani, 'id' | 'created_at' | 'tesis_idleri'>;
+
+export type PlanOzeti = { paragraf: number; tablo: number; sekil: number; gorsel: number; bolum: number; bulgu: number };
+
+export type PlanSurumu = {
+  id: string;
+  plan_id: string;
+  dosya_adi: string;
+  yol: string;
+  boyut: number;
+  ozet: Partial<PlanOzeti>;
+  created_at: string;
+  created_by: string | null;
+};
+
+export type OgeDurumu = 'degismedi' | 'kontrol' | 'guncellenecek' | 'eklenecek' | 'tamam';
+
+export type PlanOgesiSatiri = {
+  id: string;
+  plan_id: string;
+  anahtar: string;
+  tur: 'bolum' | 'tablo' | 'sekil';
+  icerik_turu: 'metin' | 'veri_tablosu' | 'dis_belge' | 'mevzuat_eki';
+  numara: string | null;
+  ad: string;
+  bolum: string | null;
+  veri_kaynagi: string | null;
+  durum: OgeDurumu;
+  notlar: string | null;
+  sira: number;
+  son_gorulen_surum: string | null;
+};
+
+/** Word'den çıkarılan öğe (anahtar ile mevcut kayda eşlenir). */
+export type CikanOge = Pick<PlanOgesiSatiri, 'anahtar' | 'tur' | 'icerik_turu' | 'numara' | 'ad' | 'bolum' | 'veri_kaynagi' | 'sira'>;
+
+export type PlanBulgusu = {
+  id: string;
+  plan_id: string;
+  surum_id: string;
+  kategori: string;
+  onem: 'yuksek' | 'orta' | 'dusuk';
+  baslik: string;
+  detay: string | null;
+  oneri: string | null;
+  durum: 'acik' | 'duzeltildi' | 'yoksay';
+  sira: number;
+};
+
+export type YeniPlanBulgusu = Pick<PlanBulgusu, 'kategori' | 'onem' | 'baslik' | 'detay' | 'oneri'> & { durum?: PlanBulgusu['durum'] };
+
+/** Büyük Word dosyası sunucuyu (Vercel 4,5 MB sınırı) atlayıp doğrudan depoya yüklenir. */
+export type YuklemeHedefi = { url: string; yontem: 'PUT' };
 
 /** Takvim aboneliği için oturumsuz okunan veri paketi. */
 export type TakvimVerisi = {
@@ -223,4 +294,25 @@ export interface Depo {
   dosyaKaydet(d: Omit<ZiyaretDosyasi, 'id' | 'created_at'>, veri: ArrayBuffer): Promise<void>;
   dosyaIcerigi(yol: string): Promise<ArrayBuffer>;
   dosyaSil(id: string): Promise<void>;
+  planlar(): Promise<IsletmePlani[]>;
+  plan(id: string): Promise<IsletmePlani | null>;
+  planOlustur(p: PlanAlanlari, tesisIdleri: string[]): Promise<string>;
+  planGuncelle(id: string, alanlar: Partial<PlanAlanlari>, tesisIdleri?: string[]): Promise<void>;
+  planSurumleri(planId: string): Promise<PlanSurumu[]>;
+  planSurumu(id: string): Promise<PlanSurumu | null>;
+  planYuklemeHedefi(yol: string): Promise<YuklemeHedefi>;
+  planDosyasi(yol: string): Promise<ArrayBuffer>;
+  /** Büyük dosya için doğrudan (imzalı) indirme adresi; null ise dosya sunucudan akıtılır. */
+  planIndirmeAdresi(yol: string, dosyaAdi: string): Promise<string | null>;
+  planDosyasiSil(yol: string): Promise<void>;
+  /** Sürümü kaydeder, öğeleri anahtarla birleştirir (durum ve notlar korunur), bulguları yazar. */
+  surumKaydet(
+    s: Pick<PlanSurumu, 'plan_id' | 'dosya_adi' | 'yol' | 'boyut' | 'ozet'>,
+    ogeler: CikanOge[],
+    bulgular: YeniPlanBulgusu[],
+  ): Promise<string>;
+  planOgeleri(planId: string): Promise<PlanOgesiSatiri[]>;
+  ogeGuncelle(id: string, alanlar: Partial<Pick<PlanOgesiSatiri, 'durum' | 'notlar'>>): Promise<void>;
+  planBulgulari(surumId: string): Promise<PlanBulgusu[]>;
+  planBulgusuGuncelle(id: string, durum: PlanBulgusu['durum']): Promise<void>;
 }

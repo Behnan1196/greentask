@@ -6,6 +6,7 @@ import type { KuralTipi } from '@/lib/termin/motor';
 import { bugun, trTarih } from '@/lib/termin/tarih';
 import { oturumuDogrula } from '@/lib/veri/depo';
 import { terminleriHesapla, type TerminSatiri } from '@/lib/veri/terminler';
+import { PLAN_DURUMU } from '@/lib/plan/durum';
 import { ZIYARET_DURUMU } from '@/lib/saha/durum';
 import type { Kullanici } from '@/lib/veri/tipler';
 import { olayEkle, olaySil, tesisSorumlusuKaydet, yukumlulukKaydet } from './eylemler';
@@ -168,12 +169,13 @@ export default async function TesisKarti(props: PageProps<'/tesisler/[kod]'>) {
   const tesis = await depo.tesis(decodeURIComponent(kod));
   if (!tesis) notFound();
 
-  const [turler, kayitlar, kisiler, ekip, ziyaretler] = await Promise.all([
+  const [turler, kayitlar, kisiler, ekip, ziyaretler, planlar] = await Promise.all([
     depo.turler(),
     depo.yukumlulukler(tesis.id),
     depo.kisiler(tesis.id),
     depo.kullanicilar(),
     depo.ziyaretler({ tesisId: tesis.id }),
+    depo.planlar(),
   ]);
   const olaylar = await depo.olaylar(kayitlar.map((k) => k.id));
   const terminler = terminleriHesapla(kayitlar, turler, [tesis], olaylar, bugun());
@@ -257,6 +259,23 @@ export default async function TesisKarti(props: PageProps<'/tesisler/[kod]'>) {
               </Link>
             ))}
             {!ziyaretler.length && <p className="text-sm text-soluk">Kayıtlı ziyaret yok.</p>}
+          </section>
+          <section className="flex flex-col gap-2 rounded-xl border border-cizgi bg-yuzey px-5 py-4">
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="text-base font-semibold">İşletme planı</h2>
+              <Link href="/planlar" className="text-sm no-underline">
+                Tümü
+              </Link>
+            </div>
+            {planlar
+              .filter((p) => p.tesis_idleri.includes(tesis.id))
+              .map((p) => (
+                <Link key={p.id} href={`/planlar/${p.id}`} className="flex justify-between gap-2 text-sm no-underline">
+                  <span className="min-w-0 truncate">{p.onayli_surum ? `Onaylı: ${p.onayli_surum}` : p.baslik}</span>
+                  <span className="shrink-0 text-soluk">{PLAN_DURUMU[p.durum].ad}</span>
+                </Link>
+              ))}
+            {!planlar.some((p) => p.tesis_idleri.includes(tesis.id)) && <p className="text-sm text-soluk">Bu tesis için plan kaydı yok.</p>}
           </section>
           <section className="flex flex-col gap-3.5 rounded-xl border border-cizgi bg-yuzey px-5 py-4">
             <h2 className="text-base font-semibold">Tesis yetkilileri</h2>

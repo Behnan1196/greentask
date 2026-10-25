@@ -32,10 +32,14 @@ async function q<T>(sql: string, p: unknown[] = []): Promise<T[]> {
 
 const TESIS = ['id', 'gt_kod', 'kisa_ad', 'resmi_unvan', 'il', 'sinif', 'nace_kodlari', 'grup_kod', 'grup_notu', 'firma_grubu',
   'sozlesme_tarihi', 'sozlesme_kapsami', 'izin_lisans_konusu', 'mevzuat_notu', 'notlar', 'aktif', 'sorumlu_id'];
-const GOREV = "g.id, g.baslik, g.aciklama, g.sorumlu_id, to_char(g.son_tarih, 'YYYY-MM-DD') as son_tarih, g.durum, g.kaynak, g.tesis_id, g.toplanti_id, g.toplanti_maddesi_id, g.created_at";
+const GOREV = "g.id, g.baslik, g.aciklama, g.sorumlu_id, to_char(g.son_tarih, 'YYYY-MM-DD') as son_tarih, g.durum, g.kaynak, g.tesis_id, g.toplanti_id, g.toplanti_maddesi_id, g.isletme_plani_id, g.plan_ogesi_id, g.created_at";
 const TOPLANTI = "id, to_char(tarih, 'YYYY-MM-DD') as tarih, baslik, notlar, durum, created_at";
 const ZIYARET = "id, tesis_id, to_char(tarih, 'YYYY-MM-DD') as tarih, ziyaretci_id, amac, durum, saha_notu, rapor_ozeti";
 const BULGU = "id, ziyaret_id, bulgu, dayanak, onem, duzeltici_faaliyet, to_char(termin, 'YYYY-MM-DD') as termin, durum, gorev_id, dosya_id, sira";
+const PLAN = `p.id, p.baslik, p.durum, p.onayli_surum, to_char(p.onay_tarihi, 'YYYY-MM-DD') as onay_tarihi,
+  to_char(p.sunum_tarihi, 'YYYY-MM-DD') as sunum_tarihi, p.hazirlayan_id, p.notlar, p.created_at,
+  coalesce((select array_agg(tesis_id::text) from plan_tesisleri pt where pt.plan_id = p.id), '{}') as tesis_idleri`;
+const OGE = 'id, plan_id, anahtar, tur, icerik_turu, numara, ad, bolum, veri_kaynagi, durum, notlar, sira, son_gorulen_surum';
 const DOSYA_DIZINI = () => process.env.GT_DEMO_DOSYA_DIZINI ?? '/tmp/gt-demo-dosyalar';
 
 function guncelle(tablo: string, id: string, alanlar: object) {
@@ -99,13 +103,14 @@ export function demoDepo(): Depo {
     async tesisSorumlusuAta(tesisId, kullaniciId) {
       await q('update tesisler set sorumlu_id = $2 where id = $1', [tesisId, kullaniciId]);
     },
-    async gorevler({ sorumluId, acik, toplantiId, toplantidan }) {
+    async gorevler({ sorumluId, acik, toplantiId, toplantidan, isletmePlaniId }) {
       const kosul: string[] = [];
       const p: unknown[] = [];
       if (sorumluId) kosul.push(`sorumlu_id = $${p.push(sorumluId)}`);
       if (acik) kosul.push("durum in ('acik', 'devam')");
       if (toplantiId) kosul.push(`toplanti_id = $${p.push(toplantiId)}`);
       if (toplantidan) kosul.push('toplanti_id is not null');
+      if (isletmePlaniId) kosul.push(`isletme_plani_id = $${p.push(isletmePlaniId)}`);
       return q(
         `select ${GOREV} from gorevler g ${kosul.length ? 'where ' + kosul.join(' and ') : ''} order by son_tarih nulls last, created_at`,
         p,
@@ -113,8 +118,10 @@ export function demoDepo(): Depo {
     },
     async gorevEkle(g) {
       const r = await q<{ id: string }>(
-        'insert into gorevler (baslik, aciklama, sorumlu_id, son_tarih, tesis_id, kaynak, toplanti_id, toplanti_maddesi_id) values ($1, $2, $3, $4, $5, $6, $7, $8) returning id',
-        [g.baslik, g.aciklama, g.sorumlu_id, g.son_tarih, g.tesis_id, g.kaynak ?? 'elle', g.toplanti_id ?? null, g.toplanti_maddesi_id ?? null],
+        `insert into gorevler (baslik, aciklama, sorumlu_id, son_tarih, tesis_id, kaynak, toplanti_id, toplanti_maddesi_id, isletme_plani_id, plan_ogesi_id)
+         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) returning id`,
+        [g.baslik, g.aciklama, g.sorumlu_id, g.son_tarih, g.tesis_id, g.kaynak ?? 'elle', g.toplanti_id ?? null, g.toplanti_maddesi_id ?? null,
+          g.isletme_plani_id ?? null, g.plan_ogesi_id ?? null],
       );
       return r[0].id;
     },
@@ -207,6 +214,94 @@ export function demoDepo(): Depo {
       const r = await q<{ yol: string }>('delete from ziyaret_dosyalari where id = $1 returning yol', [id]);
       if (r[0]) await rm(path.join(DOSYA_DIZINI(), r[0].yol), { force: true });
     },
+    async planlar() {
+      return q(`select ${PLAN} from isletme_planlari p order by created_at desc`);
+    },
+    async plan(id) {
+      return (await q<never>(`select ${PLAN} from isletme_planlari p where id = $1`, [id]))[0] ?? null;
+    },
+    async planOlustur(p, tesisIdleri) {
+      const id = (
+        await q<{ id: string }>(
+          `insert into isletme_planlari (baslik, durum, onayli_surum, onay_tarihi, sunum_tarihi, hazirlayan_id, notlar)
+           values ($1, $2, $3, $4, $5, $6, $7) returning id`,
+          [p.baslik, p.durum, p.onayli_surum, p.onay_tarihi, p.sunum_tarihi, p.hazirlayan_id, p.notlar],
+        )
+      )[0].id;
+      await q('insert into plan_tesisleri (plan_id, tesis_id) select $1, unnest($2::uuid[])', [id, tesisIdleri]);
+      return id;
+    },
+    async planGuncelle(id, alanlar, tesisIdleri) {
+      await guncelle('isletme_planlari', id, alanlar);
+      if (tesisIdleri) {
+        await q('delete from plan_tesisleri where plan_id = $1', [id]);
+        await q('insert into plan_tesisleri (plan_id, tesis_id) select $1, unnest($2::uuid[])', [id, tesisIdleri]);
+      }
+    },
+    async planSurumleri(planId) {
+      return q('select * from plan_surumleri where plan_id = $1 order by created_at desc', [planId]);
+    },
+    async planSurumu(id) {
+      return (await q<never>('select * from plan_surumleri where id = $1', [id]))[0] ?? null;
+    },
+    async planYuklemeHedefi(yol) {
+      return { url: `/api/planlar/yerel-yukle?yol=${encodeURIComponent(yol)}`, yontem: 'PUT' as const };
+    },
+    async planDosyasi(yol) {
+      const b = await readFile(path.join(DOSYA_DIZINI(), 'planlar', yol));
+      return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer;
+    },
+    async planIndirmeAdresi() {
+      return null;
+    },
+    async planDosyasiSil(yol) {
+      await rm(path.join(DOSYA_DIZINI(), 'planlar', yol), { force: true });
+    },
+    async surumKaydet(s, ogeler, bulgular) {
+      const istemci = await pool().connect();
+      try {
+        await istemci.query('begin');
+        const surumId = (
+          await istemci.query('insert into plan_surumleri (plan_id, dosya_adi, yol, boyut, ozet) values ($1, $2, $3, $4, $5) returning id', [
+            s.plan_id, s.dosya_adi, s.yol, s.boyut, s.ozet,
+          ])
+        ).rows[0].id as string;
+        await istemci.query(
+          `insert into plan_ogeleri (plan_id, anahtar, tur, icerik_turu, numara, ad, bolum, veri_kaynagi, sira, son_gorulen_surum)
+           select $1, x.anahtar, x.tur, x.icerik_turu, x.numara, x.ad, x.bolum, x.veri_kaynagi, x.sira, $2
+           from jsonb_to_recordset($3::jsonb) as x(anahtar text, tur text, icerik_turu text, numara text, ad text, bolum text, veri_kaynagi text, sira int)
+           on conflict (plan_id, anahtar) do update set tur = excluded.tur, icerik_turu = excluded.icerik_turu, numara = excluded.numara,
+             ad = excluded.ad, bolum = excluded.bolum, veri_kaynagi = excluded.veri_kaynagi, sira = excluded.sira,
+             son_gorulen_surum = excluded.son_gorulen_surum`,
+          [s.plan_id, surumId, JSON.stringify(ogeler)],
+        );
+        await istemci.query(
+          `insert into plan_bulgulari (plan_id, surum_id, kategori, onem, baslik, detay, oneri, durum, sira)
+           select $1, $2, x.kategori, x.onem, x.baslik, x.detay, x.oneri, coalesce(x.durum, 'acik'), x.sira
+           from jsonb_to_recordset($3::jsonb) as x(kategori text, onem text, baslik text, detay text, oneri text, durum text, sira int)`,
+          [s.plan_id, surumId, JSON.stringify(bulgular.map((b, i) => ({ ...b, sira: i + 1 })))],
+        );
+        await istemci.query('commit');
+        return surumId;
+      } catch (e) {
+        await istemci.query('rollback');
+        throw e;
+      } finally {
+        istemci.release();
+      }
+    },
+    async planOgeleri(planId) {
+      return q(`select ${OGE} from plan_ogeleri where plan_id = $1 order by sira`, [planId]);
+    },
+    async ogeGuncelle(id, alanlar) {
+      await guncelle('plan_ogeleri', id, alanlar);
+    },
+    async planBulgulari(surumId) {
+      return q('select id, plan_id, surum_id, kategori, onem, baslik, detay, oneri, durum, sira from plan_bulgulari where surum_id = $1 order by sira', [surumId]);
+    },
+    async planBulgusuGuncelle(id, durum) {
+      await q('update plan_bulgulari set durum = $2 where id = $1', [id, durum]);
+    },
     async gorevDurumu(id, durum) {
       await q("update gorevler set durum = $2::gorev_durumu, tamamlanma_zamani = case when $2::text = 'tamamlandi' then now() else null end where id = $1", [id, durum]);
     },
@@ -229,4 +324,11 @@ export function demoDepo(): Depo {
 export async function demoTakvimVerisi(anahtar: string): Promise<TakvimVerisi | null> {
   const r = await q<{ v: TakvimVerisi | null }>('select takvim_verisi($1::uuid) as v', [anahtar]);
   return r[0]?.v ?? null;
+}
+
+/** Demo modunda tarayıcıdan gelen plan dosyasını yerel diske yazar (Supabase imzalı yüklemenin karşılığı). */
+export async function demoPlanDosyasiYaz(yol: string, veri: ArrayBuffer) {
+  const hedef = path.join(DOSYA_DIZINI(), 'planlar', yol);
+  await mkdir(path.dirname(hedef), { recursive: true });
+  await writeFile(hedef, Buffer.from(veri));
 }

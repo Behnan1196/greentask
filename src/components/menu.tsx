@@ -9,9 +9,10 @@ const BAGLANTILAR: { href: string; ad: string; ek?: string }[] = [
   { href: '/tesisler', ad: 'Tesisler' },
   { href: '/toplantilar', ad: 'Toplantı & Görevler', ek: '/gorevler' },
   { href: '/saha', ad: 'Saha Ziyaretleri' },
+  { href: '/planlar', ad: 'İşletme Planları' },
 ];
 
-const YAKINDA = ['Belge Tasnifi', 'Mevzuat', 'İşletme Planları'];
+const YAKINDA = ['Belge Tasnifi', 'Mevzuat'];
 
 export function Menu() {
   const yol = usePathname();

@@ -85,6 +85,12 @@ git push                  # Vercel yeni kodu yayına alır
 ```
 Sıra tersine olursa yeni kod, henüz var olmayan sütunları sorgulayıp hata verir.
 
+## İşletme planları
+Word dosyası (.docx) tarayıcıdan doğrudan Supabase Storage'daki özel `planlar` kovasına yüklenir (Vercel'in 4,5 MB istek sınırına takılmaz), sonra sunucuda taranır.
+Supabase'in **Storage → Settings → Global file size limit** değeri plan dosyalarından büyük olmalı (ücretsiz planda en çok 50 MB; 13 MB'lık planlar sorunsuz).
+Tarama yalnızca biçimsel ve hesapsal hataları bulur: dizin–metin uyumsuzluğu, numara atlaması, başlık stilinde olmayan başlıklar, mükerrer tablo/şekil başlıkları,
+firma unvanının farklı yazılışları, iki yıldan eski veri tabloları, sık yazım hataları ve "a x b x c = d" biçimindeki hesaplar. Kurallar: `src/lib/plan/tarama.ts`.
+
 ## Supabase'siz deneme (demo modu)
 Yerel bir Postgres'e şema ve veri yüklenip `.env.local` içine `GT_DEMO_DB_URL=postgresql://…` yazılırsa uygulama oturum açmadan o veritabanıyla çalışır.
 Bu mod yalnızca geliştirme içindir; production derlemesinde devre dışıdır.
@@ -92,7 +98,7 @@ Yerel veritabanı için önce `tests/db/supabase_stub.sql`, sonra migration, son
 
 ## Testler
 ```bash
-npm test           # kural motoru: 27 test, 13'ü Excel KOKPİT (16.07.2026) değerleriyle birebir karşılaştırma
+npm test           # kural motoru (13'ü Excel KOKPİT 16.07.2026 değerleriyle birebir), takvim, saha, plan taraması
 npm run typecheck
 npm run lint
 ```
@@ -112,4 +118,5 @@ Ayrıntılar: [docs/KURAL_KATALOGU.md](docs/KURAL_KATALOGU.md).
 - [ ] Belge tasnifi (büro bilgisayarında klasör tarayıcı → Supabase'e özet)
 - [ ] Mevzuat takip ekranı (mevcut tarama görevinin sonuçlarını buraya yazması)
 - [x] Saha ziyaretleri: otomatik hazırlık listesi, fotoğraf (tarayıcıda küçültülür) / sesli not / PDF yükleme, bulgular → görev, yazdırılabilir rapor
-- [ ] İşletme planı modülü
+- [x] İşletme planı: Word sürümleri, plan haritası (bölüm/tablo/şekil, durum ve notlar sürümler arasında korunur), hata taraması (dizin, numaralandırma, mükerrer başlık, firma unvanı, eski veri, yazım, hesap), revizyon maddeleri → görev
+- [ ] İşletme planı: veri tablolarını izleme kayıtlarından üretme, sıfırdan plan şablonu

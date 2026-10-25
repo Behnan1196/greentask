@@ -1,6 +1,6 @@
 import 'server-only';
 import { supabaseSunucu } from '@/lib/supabase/sunucu';
-import type { Depo } from './tipler';
+import type { Depo, IsletmePlani } from './tipler';
 
 type Istemci = Awaited<ReturnType<typeof supabaseSunucu>>;
 
@@ -8,6 +8,9 @@ function hataKontrol<T>(r: { data: T | null; error: { message: string } | null }
   if (r.error) throw new Error(`Veritabanı hatası: ${r.error.message}`);
   return r.data as T;
 }
+
+type PlanSatiri = Omit<IsletmePlani, 'tesis_idleri'> & { plan_tesisleri: { tesis_id: string }[] };
+const planCevir = ({ plan_tesisleri, ...p }: PlanSatiri): IsletmePlani => ({ ...p, tesis_idleri: plan_tesisleri.map((t) => t.tesis_id) });
 
 /** Supabase ile çalışan veri katmanı. Tüm sorgular kullanıcının oturumuyla yapılır; yetki RLS'te. */
 export function supabaseDepo(db: Istemci): Depo {
@@ -59,12 +62,13 @@ export function supabaseDepo(db: Istemci): Depo {
     async tesisSorumlusuAta(tesisId, kullaniciId) {
       hataKontrol(await db.from('tesisler').update({ sorumlu_id: kullaniciId }).eq('id', tesisId).select('id').single());
     },
-    async gorevler({ sorumluId, acik, toplantiId, toplantidan }) {
+    async gorevler({ sorumluId, acik, toplantiId, toplantidan, isletmePlaniId }) {
       let q = db.from('gorevler').select('*').order('son_tarih', { ascending: true, nullsFirst: false });
       if (sorumluId) q = q.eq('sorumlu_id', sorumluId);
       if (acik) q = q.in('durum', ['acik', 'devam']);
       if (toplantiId) q = q.eq('toplanti_id', toplantiId);
       if (toplantidan) q = q.not('toplanti_id', 'is', null);
+      if (isletmePlaniId) q = q.eq('isletme_plani_id', isletmePlaniId);
       return hataKontrol(await q);
     },
     async gorevEkle(g) {
@@ -155,6 +159,87 @@ export function supabaseDepo(db: Istemci): Depo {
       const d = hataKontrol(await db.from('ziyaret_dosyalari').select('yol').eq('id', id).single()) as { yol: string };
       hataKontrol(await db.from('ziyaret_dosyalari').delete().eq('id', id).select('id').single());
       await db.storage.from('saha').remove([d.yol]);
+    },
+    async planlar() {
+      const r = hataKontrol(await db.from('isletme_planlari').select('*, plan_tesisleri(tesis_id)').order('created_at', { ascending: false }));
+      return (r as PlanSatiri[]).map(planCevir);
+    },
+    async plan(id) {
+      const r = hataKontrol(await db.from('isletme_planlari').select('*, plan_tesisleri(tesis_id)').eq('id', id).maybeSingle());
+      return r ? planCevir(r as PlanSatiri) : null;
+    },
+    async planOlustur(p, tesisIdleri) {
+      const r = await db.from('isletme_planlari').insert(p).select('id').single();
+      if (r.error) throw new Error(`Veritabanı hatası: ${r.error.message}`);
+      const id = (r.data as { id: string }).id;
+      if (tesisIdleri.length) hataKontrol(await db.from('plan_tesisleri').insert(tesisIdleri.map((tesis_id) => ({ plan_id: id, tesis_id }))).select('plan_id'));
+      return id;
+    },
+    async planGuncelle(id, alanlar, tesisIdleri) {
+      if (Object.keys(alanlar).length) hataKontrol(await db.from('isletme_planlari').update(alanlar).eq('id', id).select('id').single());
+      if (tesisIdleri) {
+        hataKontrol(await db.from('plan_tesisleri').delete().eq('plan_id', id).select('plan_id'));
+        if (tesisIdleri.length) hataKontrol(await db.from('plan_tesisleri').insert(tesisIdleri.map((tesis_id) => ({ plan_id: id, tesis_id }))).select('plan_id'));
+      }
+    },
+    async planSurumleri(planId) {
+      return hataKontrol(await db.from('plan_surumleri').select('*').eq('plan_id', planId).order('created_at', { ascending: false }));
+    },
+    async planSurumu(id) {
+      return hataKontrol(await db.from('plan_surumleri').select('*').eq('id', id).maybeSingle());
+    },
+    async planYuklemeHedefi(yol) {
+      const r = await db.storage.from('planlar').createSignedUploadUrl(yol);
+      if (r.error || !r.data) throw new Error(`Yükleme adresi alınamadı: ${r.error?.message}`);
+      return { url: r.data.signedUrl, yontem: 'PUT' as const };
+    },
+    async planDosyasi(yol) {
+      const r = await db.storage.from('planlar').download(yol);
+      if (r.error || !r.data) throw new Error(`Dosya okunamadı: ${r.error?.message}`);
+      return r.data.arrayBuffer();
+    },
+    async planIndirmeAdresi(yol, dosyaAdi) {
+      const r = await db.storage.from('planlar').createSignedUrl(yol, 300, { download: dosyaAdi });
+      if (r.error || !r.data) throw new Error(`İndirme adresi alınamadı: ${r.error?.message}`);
+      return r.data.signedUrl;
+    },
+    async planDosyasiSil(yol) {
+      await db.storage.from('planlar').remove([yol]);
+    },
+    async surumKaydet(s, ogeler, bulgular) {
+      const r = await db.from('plan_surumleri').insert(s).select('id').single();
+      if (r.error) throw new Error(`Veritabanı hatası: ${r.error.message}`);
+      const surumId = (r.data as { id: string }).id;
+      if (ogeler.length) {
+        // durum ve notlar gönderilmez: mevcut öğede korunur, yeni öğede varsayılan alır
+        hataKontrol(
+          await db
+            .from('plan_ogeleri')
+            .upsert(ogeler.map((o) => ({ ...o, plan_id: s.plan_id, son_gorulen_surum: surumId })), { onConflict: 'plan_id,anahtar' })
+            .select('id'),
+        );
+      }
+      if (bulgular.length) {
+        hataKontrol(
+          await db
+            .from('plan_bulgulari')
+            .insert(bulgular.map((b, i) => ({ ...b, plan_id: s.plan_id, surum_id: surumId, sira: i + 1 })))
+            .select('id'),
+        );
+      }
+      return surumId;
+    },
+    async planOgeleri(planId) {
+      return hataKontrol(await db.from('plan_ogeleri').select('*').eq('plan_id', planId).order('sira'));
+    },
+    async ogeGuncelle(id, alanlar) {
+      hataKontrol(await db.from('plan_ogeleri').update(alanlar).eq('id', id).select('id').single());
+    },
+    async planBulgulari(surumId) {
+      return hataKontrol(await db.from('plan_bulgulari').select('*').eq('surum_id', surumId).order('sira'));
+    },
+    async planBulgusuGuncelle(id, durum) {
+      hataKontrol(await db.from('plan_bulgulari').update({ durum }).eq('id', id).select('id').single());
     },
     async gorevDurumu(id, durum) {
       const tamamlanma_zamani = durum === 'tamamlandi' ? new Date().toISOString() : null;

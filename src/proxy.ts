@@ -37,5 +37,6 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)'],
+  // api/planlar/yerel-yukle: yalnızca demo; büyük Word dosyası proxy'nin 10 MB gövde sınırına takılmasın
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|api/planlar/yerel-yukle|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)'],
 };
