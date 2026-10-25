@@ -47,6 +47,45 @@ export function supabaseDepo(db: Istemci): Depo {
     async mevzuatDegisiklikleri() {
       return hataKontrol(await db.from('mevzuat_degisiklikleri').select('*').order('tespit_tarihi', { ascending: false }));
     },
+    async degisiklikEkle(d) {
+      const r = await db.from('mevzuat_degisiklikleri').insert(d).select('id').single();
+      if (r.error) throw new Error(`Veritabanı hatası: ${r.error.message}`);
+      return (r.data as { id: string }).id;
+    },
+    async degisiklikGuncelle(id, alanlar) {
+      hataKontrol(await db.from('mevzuat_degisiklikleri').update(alanlar).eq('id', id).select('id').single());
+    },
+    async sektorGruplari() {
+      return hataKontrol(await db.from('sektor_gruplari').select('kod, ad, aciklama'));
+    },
+    async mevzuatlar() {
+      return hataKontrol(
+        await db.from('mevzuat').select('id, kategori, tur, ad, rg_metin, rg_tarih, rg_sayi, teyit_gerekli, kapsam_notu').order('kategori', { nullsFirst: false }).order('ad'),
+      );
+    },
+    async mevzuat(id) {
+      return hataKontrol(await db.from('mevzuat').select('id, kategori, tur, ad, rg_metin, rg_tarih, rg_sayi, teyit_gerekli, kapsam_notu').eq('id', id).maybeSingle());
+    },
+    async mevzuatEkle(m) {
+      const r = await db.from('mevzuat').insert(m).select('id').single();
+      if (r.error) throw new Error(`Veritabanı hatası: ${r.error.message}`);
+      return (r.data as { id: string }).id;
+    },
+    async mevzuatGuncelle(id, alanlar) {
+      hataKontrol(await db.from('mevzuat').update(alanlar).eq('id', id).select('id').single());
+    },
+    async mevzuatMatrisi(mevzuatId) {
+      let q = db.from('mevzuat_matrisi').select('mevzuat_id, grup_kod, uygulama');
+      if (mevzuatId) q = q.eq('mevzuat_id', mevzuatId);
+      return hataKontrol(await q);
+    },
+    async matrisAyarla(mevzuatId, grupKod, uygulama) {
+      if (uygulama) {
+        hataKontrol(await db.from('mevzuat_matrisi').upsert({ mevzuat_id: mevzuatId, grup_kod: grupKod, uygulama }).select('mevzuat_id'));
+      } else {
+        hataKontrol(await db.from('mevzuat_matrisi').delete().eq('mevzuat_id', mevzuatId).eq('grup_kod', grupKod).select('mevzuat_id'));
+      }
+    },
     async yukumlulukGuncelle(id, alanlar) {
       hataKontrol(await db.from('tesis_yukumlulukleri').update(alanlar).eq('id', id).select('id').single());
     },
@@ -62,13 +101,14 @@ export function supabaseDepo(db: Istemci): Depo {
     async tesisSorumlusuAta(tesisId, kullaniciId) {
       hataKontrol(await db.from('tesisler').update({ sorumlu_id: kullaniciId }).eq('id', tesisId).select('id').single());
     },
-    async gorevler({ sorumluId, acik, toplantiId, toplantidan, isletmePlaniId }) {
+    async gorevler({ sorumluId, acik, toplantiId, toplantidan, isletmePlaniId, mevzuatDegisikligiId }) {
       let q = db.from('gorevler').select('*').order('son_tarih', { ascending: true, nullsFirst: false });
       if (sorumluId) q = q.eq('sorumlu_id', sorumluId);
       if (acik) q = q.in('durum', ['acik', 'devam']);
       if (toplantiId) q = q.eq('toplanti_id', toplantiId);
       if (toplantidan) q = q.not('toplanti_id', 'is', null);
       if (isletmePlaniId) q = q.eq('isletme_plani_id', isletmePlaniId);
+      if (mevzuatDegisikligiId) q = q.eq('mevzuat_degisikligi_id', mevzuatDegisikligiId);
       return hataKontrol(await q);
     },
     async gorevEkle(g) {

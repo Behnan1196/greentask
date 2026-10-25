@@ -83,7 +83,26 @@ export type MevzuatDegisikligi = {
   etkilenen_tesisler: string | null;
   aksiyon: string | null;
   durum: 'acik' | 'kapali';
+  mevzuat_id: string | null;
 };
+
+export type YeniDegisiklik = Omit<MevzuatDegisikligi, 'id' | 'durum'>;
+
+export type Mevzuat = {
+  id: string;
+  kategori: string | null;
+  tur: string | null;
+  ad: string;
+  rg_metin: string | null;
+  rg_tarih: string | null;
+  rg_sayi: string | null;
+  teyit_gerekli: boolean;
+  kapsam_notu: string | null;
+};
+
+export type MatrisHucresi = { mevzuat_id: string; grup_kod: string; uygulama: 'X' | 'K' };
+
+export type SektorGrubu = { kod: string; ad: string; aciklama: string | null };
 
 export type YukumlulukGuncelleme = Partial<
   Pick<TesisYukumlulukSatiri, 'durum' | 'gecerlilik_bitis' | 'belge_tarihi' | 'son_islem' | 'baslangic' | 'notlar' | 'sorumlu_id'>
@@ -104,11 +123,12 @@ export type Gorev = {
   toplanti_maddesi_id: string | null;
   isletme_plani_id: string | null;
   plan_ogesi_id: string | null;
+  mevzuat_degisikligi_id: string | null;
   created_at: string;
 };
 
 export type YeniGorev = Pick<Gorev, 'baslik' | 'aciklama' | 'sorumlu_id' | 'son_tarih' | 'tesis_id'> &
-  Partial<Pick<Gorev, 'toplanti_id' | 'toplanti_maddesi_id' | 'kaynak' | 'isletme_plani_id' | 'plan_ogesi_id'>>;
+  Partial<Pick<Gorev, 'toplanti_id' | 'toplanti_maddesi_id' | 'kaynak' | 'isletme_plani_id' | 'plan_ogesi_id' | 'mevzuat_degisikligi_id'>>;
 
 export type Toplanti = {
   id: string;
@@ -173,7 +193,7 @@ export type ZiyaretDosyasi = {
   created_at: string;
 };
 
-export type GorevFiltresi = { sorumluId?: string; acik?: boolean; toplantiId?: string; toplantidan?: boolean; isletmePlaniId?: string };
+export type GorevFiltresi = { sorumluId?: string; acik?: boolean; toplantiId?: string; toplantidan?: boolean; isletmePlaniId?: string; mevzuatDegisikligiId?: string };
 
 export type PlanDurumu = 'taslak' | 'revizyonda' | 'sunuldu' | 'onaylandi';
 
@@ -264,6 +284,16 @@ export interface Depo {
   yukumlulukler(tesisId?: string): Promise<TesisYukumlulukSatiri[]>;
   olaylar(tesisYukumlulukIdleri?: string[]): Promise<OlaySatiri[]>;
   mevzuatDegisiklikleri(): Promise<MevzuatDegisikligi[]>;
+  degisiklikEkle(d: YeniDegisiklik): Promise<string>;
+  degisiklikGuncelle(id: string, alanlar: Partial<Omit<MevzuatDegisikligi, 'id'>>): Promise<void>;
+  sektorGruplari(): Promise<SektorGrubu[]>;
+  mevzuatlar(): Promise<Mevzuat[]>;
+  mevzuat(id: string): Promise<Mevzuat | null>;
+  mevzuatEkle(m: Omit<Mevzuat, 'id'>): Promise<string>;
+  mevzuatGuncelle(id: string, alanlar: Partial<Omit<Mevzuat, 'id'>>): Promise<void>;
+  mevzuatMatrisi(mevzuatId?: string): Promise<MatrisHucresi[]>;
+  /** null: o grup için hücreyi siler. */
+  matrisAyarla(mevzuatId: string, grupKod: string, uygulama: 'X' | 'K' | null): Promise<void>;
   yukumlulukGuncelle(id: string, alanlar: YukumlulukGuncelleme): Promise<void>;
   olayEkle(o: Omit<OlaySatiri, 'id'>): Promise<void>;
   olaySil(id: string): Promise<void>;

@@ -32,13 +32,14 @@ async function q<T>(sql: string, p: unknown[] = []): Promise<T[]> {
 
 const TESIS = ['id', 'gt_kod', 'kisa_ad', 'resmi_unvan', 'il', 'sinif', 'nace_kodlari', 'grup_kod', 'grup_notu', 'firma_grubu',
   'sozlesme_tarihi', 'sozlesme_kapsami', 'izin_lisans_konusu', 'mevzuat_notu', 'notlar', 'aktif', 'sorumlu_id'];
-const GOREV = "g.id, g.baslik, g.aciklama, g.sorumlu_id, to_char(g.son_tarih, 'YYYY-MM-DD') as son_tarih, g.durum, g.kaynak, g.tesis_id, g.toplanti_id, g.toplanti_maddesi_id, g.isletme_plani_id, g.plan_ogesi_id, g.created_at";
+const GOREV = "g.id, g.baslik, g.aciklama, g.sorumlu_id, to_char(g.son_tarih, 'YYYY-MM-DD') as son_tarih, g.durum, g.kaynak, g.tesis_id, g.toplanti_id, g.toplanti_maddesi_id, g.isletme_plani_id, g.plan_ogesi_id, g.mevzuat_degisikligi_id, g.created_at";
 const TOPLANTI = "id, to_char(tarih, 'YYYY-MM-DD') as tarih, baslik, notlar, durum, created_at";
 const ZIYARET = "id, tesis_id, to_char(tarih, 'YYYY-MM-DD') as tarih, ziyaretci_id, amac, durum, saha_notu, rapor_ozeti";
 const BULGU = "id, ziyaret_id, bulgu, dayanak, onem, duzeltici_faaliyet, to_char(termin, 'YYYY-MM-DD') as termin, durum, gorev_id, dosya_id, sira";
 const PLAN = `p.id, p.baslik, p.durum, p.onayli_surum, to_char(p.onay_tarihi, 'YYYY-MM-DD') as onay_tarihi,
   to_char(p.sunum_tarihi, 'YYYY-MM-DD') as sunum_tarihi, p.hazirlayan_id, p.notlar, p.created_at,
   coalesce((select array_agg(tesis_id::text) from plan_tesisleri pt where pt.plan_id = p.id), '{}') as tesis_idleri`;
+const MEVZUAT = "id, kategori, tur, ad, rg_metin, to_char(rg_tarih, 'YYYY-MM-DD') as rg_tarih, rg_sayi, teyit_gerekli, kapsam_notu";
 const OGE = 'id, plan_id, anahtar, tur, icerik_turu, numara, ad, bolum, veri_kaynagi, durum, notlar, sira, son_gorulen_surum';
 const DOSYA_DIZINI = () => process.env.GT_DEMO_DOSYA_DIZINI ?? '/tmp/gt-demo-dosyalar';
 
@@ -81,7 +82,54 @@ export function demoDepo(): Depo {
     },
     async mevzuatDegisiklikleri() {
       return q(`select id, to_char(tespit_tarihi, 'YYYY-MM-DD') as tespit_tarihi, rg_metin, tur, ad, ozet, etkilenen_gruplar,
-                       etkilenen_tesisler, aksiyon, durum from mevzuat_degisiklikleri order by tespit_tarihi desc`);
+                       etkilenen_tesisler, aksiyon, durum, mevzuat_id from mevzuat_degisiklikleri order by tespit_tarihi desc, created_at desc`);
+    },
+    async degisiklikEkle(d) {
+      return (
+        await q<{ id: string }>(
+          `insert into mevzuat_degisiklikleri (tespit_tarihi, rg_metin, tur, ad, ozet, etkilenen_gruplar, etkilenen_tesisler, aksiyon, mevzuat_id)
+           values ($1, $2, $3, $4, $5, $6, $7, $8, $9) returning id`,
+          [d.tespit_tarihi, d.rg_metin, d.tur, d.ad, d.ozet, d.etkilenen_gruplar, d.etkilenen_tesisler, d.aksiyon, d.mevzuat_id],
+        )
+      )[0].id;
+    },
+    async degisiklikGuncelle(id, alanlar) {
+      await guncelle('mevzuat_degisiklikleri', id, alanlar);
+    },
+    async sektorGruplari() {
+      return q('select kod, ad, aciklama from sektor_gruplari');
+    },
+    async mevzuatlar() {
+      return q(`select ${MEVZUAT} from mevzuat order by kategori nulls last, ad`);
+    },
+    async mevzuat(id) {
+      return (await q<never>(`select ${MEVZUAT} from mevzuat where id = $1`, [id]))[0] ?? null;
+    },
+    async mevzuatEkle(m) {
+      return (
+        await q<{ id: string }>(
+          'insert into mevzuat (kategori, tur, ad, rg_metin, rg_tarih, rg_sayi, teyit_gerekli, kapsam_notu) values ($1, $2, $3, $4, $5, $6, $7, $8) returning id',
+          [m.kategori, m.tur, m.ad, m.rg_metin, m.rg_tarih, m.rg_sayi, m.teyit_gerekli, m.kapsam_notu],
+        )
+      )[0].id;
+    },
+    async mevzuatGuncelle(id, alanlar) {
+      await guncelle('mevzuat', id, alanlar);
+    },
+    async mevzuatMatrisi(mevzuatId) {
+      return mevzuatId
+        ? q('select mevzuat_id, grup_kod, uygulama from mevzuat_matrisi where mevzuat_id = $1', [mevzuatId])
+        : q('select mevzuat_id, grup_kod, uygulama from mevzuat_matrisi');
+    },
+    async matrisAyarla(mevzuatId, grupKod, uygulama) {
+      if (uygulama) {
+        await q(
+          'insert into mevzuat_matrisi (mevzuat_id, grup_kod, uygulama) values ($1, $2, $3) on conflict (mevzuat_id, grup_kod) do update set uygulama = excluded.uygulama',
+          [mevzuatId, grupKod, uygulama],
+        );
+      } else {
+        await q('delete from mevzuat_matrisi where mevzuat_id = $1 and grup_kod = $2', [mevzuatId, grupKod]);
+      }
     },
     async yukumlulukGuncelle(id, alanlar) {
       const anahtarlar = Object.keys(alanlar);
@@ -103,7 +151,7 @@ export function demoDepo(): Depo {
     async tesisSorumlusuAta(tesisId, kullaniciId) {
       await q('update tesisler set sorumlu_id = $2 where id = $1', [tesisId, kullaniciId]);
     },
-    async gorevler({ sorumluId, acik, toplantiId, toplantidan, isletmePlaniId }) {
+    async gorevler({ sorumluId, acik, toplantiId, toplantidan, isletmePlaniId, mevzuatDegisikligiId }) {
       const kosul: string[] = [];
       const p: unknown[] = [];
       if (sorumluId) kosul.push(`sorumlu_id = $${p.push(sorumluId)}`);
@@ -111,6 +159,7 @@ export function demoDepo(): Depo {
       if (toplantiId) kosul.push(`toplanti_id = $${p.push(toplantiId)}`);
       if (toplantidan) kosul.push('toplanti_id is not null');
       if (isletmePlaniId) kosul.push(`isletme_plani_id = $${p.push(isletmePlaniId)}`);
+      if (mevzuatDegisikligiId) kosul.push(`mevzuat_degisikligi_id = $${p.push(mevzuatDegisikligiId)}`);
       return q(
         `select ${GOREV} from gorevler g ${kosul.length ? 'where ' + kosul.join(' and ') : ''} order by son_tarih nulls last, created_at`,
         p,
@@ -118,10 +167,10 @@ export function demoDepo(): Depo {
     },
     async gorevEkle(g) {
       const r = await q<{ id: string }>(
-        `insert into gorevler (baslik, aciklama, sorumlu_id, son_tarih, tesis_id, kaynak, toplanti_id, toplanti_maddesi_id, isletme_plani_id, plan_ogesi_id)
-         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) returning id`,
+        `insert into gorevler (baslik, aciklama, sorumlu_id, son_tarih, tesis_id, kaynak, toplanti_id, toplanti_maddesi_id, isletme_plani_id, plan_ogesi_id, mevzuat_degisikligi_id)
+         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) returning id`,
         [g.baslik, g.aciklama, g.sorumlu_id, g.son_tarih, g.tesis_id, g.kaynak ?? 'elle', g.toplanti_id ?? null, g.toplanti_maddesi_id ?? null,
-          g.isletme_plani_id ?? null, g.plan_ogesi_id ?? null],
+          g.isletme_plani_id ?? null, g.plan_ogesi_id ?? null, g.mevzuat_degisikligi_id ?? null],
       );
       return r[0].id;
     },

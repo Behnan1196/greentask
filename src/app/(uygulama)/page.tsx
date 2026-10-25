@@ -224,13 +224,13 @@ export default async function Kokpit(props: PageProps<'/'>) {
           <section className="flex flex-col gap-3 rounded-xl border border-cizgi bg-yuzey px-5 py-4">
             <h2 className="text-base font-semibold">Açık mevzuat değişiklikleri · {acikMevzuat.length}</h2>
             {acikMevzuat.map((d) => (
-              <div key={d.id} className="flex flex-col gap-1 rounded-lg bg-[#fbf6ee] p-3">
+              <Link key={d.id} href={`/mevzuat?acik=${d.id}#d-${d.id}`} className="flex flex-col gap-1 rounded-lg bg-[#fbf6ee] p-3 no-underline">
                 <span className="text-xs font-semibold uppercase text-turuncu">
                   {d.tur} · RG {d.rg_metin}
                 </span>
-                <span className="text-sm font-medium">{d.ad}</span>
+                <span className="text-sm font-medium text-murekkep">{d.ad}</span>
                 <span className="text-sm text-murekkep-2">{d.etkilenen_tesisler}</span>
-              </div>
+              </Link>
             ))}
           </section>
           <section className="flex flex-col gap-2.5 rounded-xl border border-cizgi bg-yuzey px-5 py-4">

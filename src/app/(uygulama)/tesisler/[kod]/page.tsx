@@ -6,6 +6,7 @@ import type { KuralTipi } from '@/lib/termin/motor';
 import { bugun, trTarih } from '@/lib/termin/tarih';
 import { oturumuDogrula } from '@/lib/veri/depo';
 import { terminleriHesapla, type TerminSatiri } from '@/lib/veri/terminler';
+import { etkilenenTesisler, tesisMevzuati } from '@/lib/mevzuat/etki';
 import { PLAN_DURUMU } from '@/lib/plan/durum';
 import { ZIYARET_DURUMU } from '@/lib/saha/durum';
 import type { Kullanici } from '@/lib/veri/tipler';
@@ -169,14 +170,22 @@ export default async function TesisKarti(props: PageProps<'/tesisler/[kod]'>) {
   const tesis = await depo.tesis(decodeURIComponent(kod));
   if (!tesis) notFound();
 
-  const [turler, kayitlar, kisiler, ekip, ziyaretler, planlar] = await Promise.all([
+  const [turler, kayitlar, kisiler, ekip, ziyaretler, planlar, mevzuatlar, matris, degisiklikler, gruplar] = await Promise.all([
     depo.turler(),
     depo.yukumlulukler(tesis.id),
     depo.kisiler(tesis.id),
     depo.kullanicilar(),
     depo.ziyaretler({ tesisId: tesis.id }),
     depo.planlar(),
+    depo.mevzuatlar(),
+    depo.mevzuatMatrisi(),
+    depo.mevzuatDegisiklikleri(),
+    depo.sektorGruplari(),
   ]);
+  const uygulanan = tesisMevzuati(tesis, mevzuatlar, matris);
+  const etkileyen = degisiklikler.filter(
+    (d) => d.durum === 'acik' && etkilenenTesisler(d, [tesis], gruplar.map((g) => g.kod)).some((e) => e.onerilen),
+  );
   const olaylar = await depo.olaylar(kayitlar.map((k) => k.id));
   const terminler = terminleriHesapla(kayitlar, turler, [tesis], olaylar, bugun());
   const takipte = terminler.filter((s) => ['muaf', 'kapsam_disi'].indexOf(s.sonuc.durum) < 0);
@@ -296,12 +305,28 @@ export default async function TesisKarti(props: PageProps<'/tesisler/[kod]'>) {
             ))}
             {!kisiler.length && <p className="text-sm text-soluk">Kayıtlı kişi yok.</p>}
           </section>
-          {tesis.mevzuat_notu && (
-            <section className="flex flex-col gap-2 rounded-xl border border-cizgi bg-yuzey px-5 py-4">
-              <h2 className="text-base font-semibold">Mevzuat notu</h2>
-              <p className="text-sm text-murekkep-2">{tesis.mevzuat_notu}</p>
-            </section>
-          )}
+          <section className="flex flex-col gap-2 rounded-xl border border-cizgi bg-yuzey px-5 py-4">
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="text-base font-semibold">Mevzuat</h2>
+              {tesis.grup_kod && (
+                <Link href={`/mevzuat?sekme=kutuphane&grup=${tesis.grup_kod}`} className="text-sm no-underline">
+                  Listele
+                </Link>
+              )}
+            </div>
+            <p className="text-sm text-murekkep-2">
+              {tesis.grup_kod
+                ? `Grup ${tesis.grup_kod}: ${uygulanan.filter((u) => u.uygulama === 'X').length} mevzuat doğrudan, ${uygulanan.filter((u) => u.uygulama === 'K').length} koşullu uygulanıyor.`
+                : 'Sektör grubu girilmemiş; uygulanan mevzuat çıkarılamıyor.'}
+            </p>
+            {etkileyen.map((d) => (
+              <Link key={d.id} href={`/mevzuat?acik=${d.id}#d-${d.id}`} className="flex flex-col rounded-lg bg-[#fbf6ee] px-3 py-2 text-sm no-underline">
+                <span className="text-xs font-semibold uppercase text-turuncu">Açık değişiklik · {d.tur}</span>
+                <span className="text-murekkep">{d.ad}</span>
+              </Link>
+            ))}
+            {tesis.mevzuat_notu && <p className="border-t border-cizgi-ince pt-2 text-sm text-murekkep-2">{tesis.mevzuat_notu}</p>}
+          </section>
         </aside>
       </div>
     </div>
