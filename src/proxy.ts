@@ -25,7 +25,8 @@ export async function proxy(request: NextRequest) {
   });
 
   const { data } = await supabase.auth.getClaims();
-  const girisSayfasi = request.nextUrl.pathname.startsWith('/giris');
+  const yol = request.nextUrl.pathname;
+  const girisSayfasi = yol.startsWith('/giris') || yol.startsWith('/auth/');
   if (!data?.claims && !girisSayfasi) {
     const hedef = request.nextUrl.clone();
     hedef.pathname = '/giris';

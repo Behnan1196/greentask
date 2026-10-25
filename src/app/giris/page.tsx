@@ -2,11 +2,13 @@ import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { demoModu } from '@/lib/veri/depo';
 import { GirisFormu } from './giris-formu';
+import { SifirlamaFormu } from './sifirlama-formu';
 
 export const metadata: Metadata = { title: 'Giriş' };
 
-export default function GirisSayfasi() {
+export default async function GirisSayfasi(props: PageProps<'/giris'>) {
   if (demoModu()) redirect('/');
+  const { hata } = await props.searchParams;
   return (
     <main className="flex min-h-screen items-center justify-center px-4">
       <div className="w-full max-w-sm rounded-xl border border-cizgi bg-yuzey p-8">
@@ -17,8 +19,14 @@ export default function GirisSayfasi() {
             <p className="text-sm text-soluk">İş Sistemi</p>
           </div>
         </div>
+        {hata === 'baglanti' && (
+          <p role="alert" className="mb-4 rounded-lg bg-kirmizi-zemin px-3 py-2 text-sm text-kirmizi">
+            Bağlantı geçersiz ya da süresi dolmuş. Aşağıdan yeni bağlantı isteyin.
+          </p>
+        )}
         <GirisFormu />
-        <p className="mt-6 text-sm text-soluk">Hesabınız yoksa sistem yöneticisinden davet isteyin.</p>
+        <SifirlamaFormu />
+        <p className="mt-4 text-sm text-soluk">Hesabınız yoksa sistem yöneticisinden davet isteyin.</p>
       </div>
     </main>
   );

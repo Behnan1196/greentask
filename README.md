@@ -39,7 +39,15 @@ npx supabase db push --include-seed                  # şemayı kurar, veriyi y�
 *Not: Sisteme veri girişi başladıktan sonra Excel'den yeniden aktarım yapmayın. Excel'deki eski tarih, sistemde güncellenmiş tarihin üzerine yazar.*
 
 ### 3. Kullanıcılar
-1. Supabase → **Authentication → Users → Invite user** ile her çalışanı e-postasıyla davet edin.
+Önce bir kez, e-posta bağlantılarını uygulamaya yönlendirin:
+- **Authentication → URL Configuration → Site URL:** uygulamanın adresi (şimdilik `http://localhost:3000`, büro bilgisayarına geçince onun adresi).
+- **Authentication → Emails → Templates:** *Invite user* ve *Reset password* şablonlarındaki bağlantıyı (`{{ .ConfirmationURL }}`) şununla değiştirin:
+  - Invite: `{{ .SiteURL }}/auth/onay?token_hash={{ .TokenHash }}&type=invite`
+  - Reset password: `{{ .SiteURL }}/auth/onay?token_hash={{ .TokenHash }}&type=recovery`
+
+Sonra:
+1. Supabase → **Authentication → Users → Invite user** ile her çalışanı e-postasıyla davet edin. Bağlantıya tıklayan kişi şifre belirleme sayfasına gelir.
+   Daveti kaybeden ya da şifresini unutan kişi giriş ekranındaki "Şifremi unuttum" ile yeni bağlantı ister.
 2. İlk kullanıcıyı yönetici yapın (Supabase → SQL Editor):
    ```sql
    update public.profiller set rol = 'yonetici', ad_soyad = 'Ad Soyad' where eposta = 'kisi@ornek.com';
@@ -53,6 +61,21 @@ npx supabase db push --include-seed                  # şemayı kurar, veriyi y�
 npm run dev        # http://localhost:3000
 ```
 Büro bilgisayarında sürekli açık kullanım için: `npm run build && npm run start`.
+
+## Yayına alma (Vercel)
+1. https://vercel.com → **Add New → Project** → GitHub'daki `greentask` deposunu seçin. Framework otomatik "Next.js" gelir; başka ayar gerekmez.
+2. **Environment Variables** bölümüne `NEXT_PUBLIC_SUPABASE_URL` ve `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` değerlerini girip **Deploy** deyin.
+   (`GT_DEMO_DB_URL` Vercel'e girilmez; demo modu production'da zaten kapalı.)
+3. Supabase → **Authentication → URL Configuration**:
+   - **Site URL:** Vercel adresi, örn. `https://greentask.vercel.app`
+   - **Redirect URLs:** aynı adres + `http://localhost:3000/**` (yerel geliştirme için)
+4. Sunucu bölgesi `vercel.json` ile Frankfurt'a (`fra1`) sabit; Supabase projesi de Frankfurt'taysa sorgular aynı bölgede kalır.
+
+Bundan sonra `main` dalına her `git push` otomatik yayına alınır; diğer dallar ayrı önizleme adresi alır.
+
+**E-posta:** Supabase'in yerleşik e-posta servisi yalnızca proje ekibindeki adreslere ve saatte birkaç e-posta gönderir.
+Çalışanlara davet gidebilmesi için **Project Settings → Authentication → SMTP Settings** ile kendi SMTP'nizi tanımlayın
+(örn. Resend, Brevo ya da şirket e-postası).
 
 ## Supabase'siz deneme (demo modu)
 Yerel bir Postgres'e şema ve veri yüklenip `.env.local` içine `GT_DEMO_DB_URL=postgresql://…` yazılırsa uygulama oturum açmadan o veritabanıyla çalışır.

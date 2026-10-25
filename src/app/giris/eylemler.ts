@@ -21,3 +21,14 @@ export async function cikisYap() {
   await db.auth.signOut();
   redirect('/giris');
 }
+
+export type SifirlamaDurumu = { mesaj?: string; hata?: string };
+
+export async function sifreSifirla(_onceki: SifirlamaDurumu, form: FormData): Promise<SifirlamaDurumu> {
+  const eposta = String(form.get('eposta') ?? '').trim();
+  if (!eposta) return { hata: 'E-posta adresinizi yazın.' };
+  const db = await supabaseSunucu();
+  await db.auth.resetPasswordForEmail(eposta);
+  // Hesap var mı yok mu belli etmemek için her durumda aynı mesaj.
+  return { mesaj: 'Bu adres kayıtlıysa şifre belirleme bağlantısı gönderildi. E-postanızı kontrol edin.' };
+}
