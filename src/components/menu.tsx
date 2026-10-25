@@ -3,20 +3,21 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
-const BAGLANTILAR = [
+const BAGLANTILAR: { href: string; ad: string; ek?: string }[] = [
   { href: '/', ad: 'Kokpit' },
   { href: '/islerim', ad: 'Benim İşlerim' },
   { href: '/tesisler', ad: 'Tesisler' },
+  { href: '/toplantilar', ad: 'Toplantı & Görevler', ek: '/gorevler' },
 ];
 
-const YAKINDA = ['Belge Tasnifi', 'Mevzuat', 'Toplantı & Görevler', 'Saha Ziyaretleri', 'İşletme Planları'];
+const YAKINDA = ['Belge Tasnifi', 'Mevzuat', 'Saha Ziyaretleri', 'İşletme Planları'];
 
 export function Menu() {
   const yol = usePathname();
   return (
     <nav aria-label="Ana menü" className="flex flex-col gap-1">
       {BAGLANTILAR.map((b) => {
-        const aktif = b.href === '/' ? yol === '/' : yol.startsWith(b.href);
+        const aktif = b.href === '/' ? yol === '/' : yol.startsWith(b.href) || (!!b.ek && yol.startsWith(b.ek));
         return (
           <Link
             key={b.href}

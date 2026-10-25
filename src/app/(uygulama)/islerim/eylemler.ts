@@ -26,7 +26,7 @@ export async function gorevEkle(form: FormData) {
     tesis_id: secimli(form, 'tesis_id', UUID),
     sorumlu_id: secimli(form, 'sorumlu_id', UUID) ?? kullanici.id,
   });
-  revalidatePath('/islerim');
+  revalidatePath('/', 'layout');
 }
 
 export async function gorevDurumu(form: FormData) {
@@ -35,11 +35,11 @@ export async function gorevDurumu(form: FormData) {
   const durum = String(form.get('durum') ?? '') as GorevDurumu;
   if (!id || !DURUMLAR.includes(durum)) throw new Error('Geçersiz istek');
   await depo.gorevDurumu(id, durum);
-  revalidatePath('/islerim');
+  revalidatePath('/', 'layout');
 }
 
 export async function takvimAnahtariniYenile() {
   const { depo } = await oturumuDogrula();
   await depo.takvimAnahtari(true);
-  revalidatePath('/islerim');
+  revalidatePath('/', 'layout');
 }

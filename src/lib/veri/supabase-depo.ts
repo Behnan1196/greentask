@@ -59,14 +59,44 @@ export function supabaseDepo(db: Istemci): Depo {
     async tesisSorumlusuAta(tesisId, kullaniciId) {
       hataKontrol(await db.from('tesisler').update({ sorumlu_id: kullaniciId }).eq('id', tesisId).select('id').single());
     },
-    async gorevler({ sorumluId, acik }) {
+    async gorevler({ sorumluId, acik, toplantiId, toplantidan }) {
       let q = db.from('gorevler').select('*').order('son_tarih', { ascending: true, nullsFirst: false });
       if (sorumluId) q = q.eq('sorumlu_id', sorumluId);
       if (acik) q = q.in('durum', ['acik', 'devam']);
+      if (toplantiId) q = q.eq('toplanti_id', toplantiId);
+      if (toplantidan) q = q.not('toplanti_id', 'is', null);
       return hataKontrol(await q);
     },
     async gorevEkle(g) {
-      hataKontrol(await db.from('gorevler').insert({ ...g, kaynak: 'elle' }).select('id').single());
+      hataKontrol(await db.from('gorevler').insert({ kaynak: 'elle', ...g }).select('id').single());
+    },
+    async toplantilar() {
+      return hataKontrol(await db.from('toplantilar').select('*').order('tarih', { ascending: false }));
+    },
+    async toplanti(id) {
+      return hataKontrol(await db.from('toplantilar').select('*').eq('id', id).maybeSingle());
+    },
+    async toplantiOlustur(t) {
+      const r = await db.from('toplantilar').insert(t).select('id').single();
+      if (r.error) throw new Error(`Veritabanı hatası: ${r.error.message}`);
+      return (r.data as { id: string }).id;
+    },
+    async toplantiGuncelle(id, alanlar) {
+      hataKontrol(await db.from('toplantilar').update(alanlar).eq('id', id).select('id').single());
+    },
+    async maddeler(toplantiId) {
+      return hataKontrol(await db.from('toplanti_maddeleri').select('*').eq('toplanti_id', toplantiId).order('sira').order('created_at'));
+    },
+    async maddeEkle(m) {
+      const son = await db.from('toplanti_maddeleri').select('sira').eq('toplanti_id', m.toplanti_id).order('sira', { ascending: false }).limit(1);
+      const sira = ((son.data?.[0] as { sira: number } | undefined)?.sira ?? 0) + 1;
+      hataKontrol(await db.from('toplanti_maddeleri').insert({ ...m, sira }).select('id').single());
+    },
+    async maddeGuncelle(id, alanlar) {
+      hataKontrol(await db.from('toplanti_maddeleri').update(alanlar).eq('id', id).select('id').single());
+    },
+    async maddeSil(id) {
+      hataKontrol(await db.from('toplanti_maddeleri').delete().eq('id', id).select('id').single());
     },
     async gorevDurumu(id, durum) {
       const tamamlanma_zamani = durum === 'tamamlandi' ? new Date().toISOString() : null;

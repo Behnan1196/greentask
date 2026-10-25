@@ -101,10 +101,37 @@ export type Gorev = {
   kaynak: string;
   tesis_id: string | null;
   toplanti_id: string | null;
+  toplanti_maddesi_id: string | null;
   created_at: string;
 };
 
-export type YeniGorev = Pick<Gorev, 'baslik' | 'aciklama' | 'sorumlu_id' | 'son_tarih' | 'tesis_id'>;
+export type YeniGorev = Pick<Gorev, 'baslik' | 'aciklama' | 'sorumlu_id' | 'son_tarih' | 'tesis_id'> &
+  Partial<Pick<Gorev, 'toplanti_id' | 'toplanti_maddesi_id' | 'kaynak'>>;
+
+export type Toplanti = {
+  id: string;
+  tarih: string;
+  baslik: string;
+  notlar: string | null;
+  durum: 'acik' | 'kapandi';
+  created_at: string;
+};
+
+export type ToplantiMaddesi = {
+  id: string;
+  toplanti_id: string;
+  baslik: string;
+  karar: string | null;
+  tesis_id: string | null;
+  tesis_yukumluluk_id: string | null;
+  kaynak: 'elle' | 'sistem' | 'mevzuat';
+  sira: number;
+};
+
+export type YeniMadde = Pick<ToplantiMaddesi, 'toplanti_id' | 'baslik' | 'kaynak'> &
+  Partial<Pick<ToplantiMaddesi, 'karar' | 'tesis_id' | 'tesis_yukumluluk_id'>>;
+
+export type GorevFiltresi = { sorumluId?: string; acik?: boolean; toplantiId?: string; toplantidan?: boolean };
 
 /** Takvim aboneliği için oturumsuz okunan veri paketi. */
 export type TakvimVerisi = {
@@ -131,8 +158,16 @@ export interface Depo {
   olaySil(id: string): Promise<void>;
   kullanicilar(): Promise<Kullanici[]>;
   tesisSorumlusuAta(tesisId: string, kullaniciId: string | null): Promise<void>;
-  gorevler(filtre: { sorumluId?: string; acik?: boolean }): Promise<Gorev[]>;
+  gorevler(filtre: GorevFiltresi): Promise<Gorev[]>;
   gorevEkle(g: YeniGorev): Promise<void>;
+  toplantilar(): Promise<Toplanti[]>;
+  toplanti(id: string): Promise<Toplanti | null>;
+  toplantiOlustur(t: Pick<Toplanti, 'tarih' | 'baslik'>): Promise<string>;
+  toplantiGuncelle(id: string, alanlar: Partial<Pick<Toplanti, 'notlar' | 'durum'>>): Promise<void>;
+  maddeler(toplantiId: string): Promise<ToplantiMaddesi[]>;
+  maddeEkle(m: YeniMadde): Promise<void>;
+  maddeGuncelle(id: string, alanlar: Partial<Pick<ToplantiMaddesi, 'baslik' | 'karar'>>): Promise<void>;
+  maddeSil(id: string): Promise<void>;
   gorevDurumu(id: string, durum: GorevDurumu): Promise<void>;
   takvimAnahtari(yenile?: boolean): Promise<string>;
 }

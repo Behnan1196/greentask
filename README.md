@@ -107,7 +107,7 @@ Ayrıntılar: [docs/KURAL_KATALOGU.md](docs/KURAL_KATALOGU.md).
 ## Yol haritası
 - [x] Şema, RLS, Excel aktarımı, kural motoru, Kokpit, Tesis kartı
 - [x] Benim İşlerim: tesis/yükümlülük sorumlusu, elle görev, kişisel takvim aboneliği (.ics)
-- [ ] Toplantı & Görevler
+- [x] Toplantı & Görevler: gündem (devreden görevler + sistemin işaretledikleri), kararlar → görev, tutanak (.md), görev panosu
 - [ ] Müşteri hatırlatma e-postaları (onaylı gönderim)
 - [ ] Belge tasnifi (büro bilgisayarında klasör tarayıcı → Supabase'e özet)
 - [ ] Mevzuat takip ekranı (mevcut tarama görevinin sonuçlarını buraya yazması)
