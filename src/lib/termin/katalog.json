@@ -1,0 +1,121 @@
+[
+  {
+    "kod": "gfb_izin", "sira": 10, "ad": "GFB / Çevre İzin-Lisans", "kural_tipi": "bitis_tarihi",
+    "parametreler": { "asamalar": [{ "ad": "Ön hazırlık", "gun": 240 }, { "ad": "Başvuru", "gun": 180 }] },
+    "cezai_risk": "yuksek", "hedef_klasor": "08. GFB & ÇEVRE İZİN & LİSANS",
+    "mevzuat_dayanagi": "Çevre İzin ve Lisans Yönetmeliği",
+    "aciklama": "Bitişten 240 gün önce ön hazırlık, 180 gün önce başvuru."
+  },
+  {
+    "kod": "mss", "sira": 20, "ad": "Mali Sorumluluk Sigortası", "kural_tipi": "bitis_tarihi",
+    "parametreler": { "asamalar": [{ "ad": "Yenileme", "gun": 14 }] },
+    "cezai_risk": "var", "hedef_klasor": "13. MALİ SORUMLULUK SİGORTASI",
+    "mevzuat_dayanagi": "Tehlikeli atık mali sorumluluk sigortası",
+    "aciklama": "Yılda bir yenilenir; bitişten 14 gün önce yenileme."
+  },
+  {
+    "kod": "sifir_atik", "sira": 30, "ad": "Sıfır Atık Belgesi", "kural_tipi": "bitis_tarihi",
+    "parametreler": { "asamalar": [{ "ad": "Başvuru açılışı", "gun": 90 }] },
+    "cezai_risk": "var", "hedef_klasor": "18. SIFIR ATIK",
+    "mevzuat_dayanagi": "Sıfır Atık Yönetmeliği",
+    "aciklama": "5 yıl geçerli; bitişten 90 gün önce başvuru açılır."
+  },
+  {
+    "kod": "kapasite", "sira": 40, "ad": "Kapasite Raporu", "kural_tipi": "bitis_tarihi",
+    "parametreler": { "asamalar": [{ "ad": "Başvuru", "gun": 75 }] },
+    "cezai_risk": "dusuk", "hedef_klasor": "09.KAPASİTE RAPORU",
+    "mevzuat_dayanagi": "Sanayi odası kapasite raporu",
+    "aciklama": "Rapor 2–3 ayda çıkıyor; bitişten 75 gün önce başvuru (Excel formülü 75, başlık 60 diyordu)."
+  },
+  {
+    "kod": "eayp", "sira": 50, "ad": "Endüstriyel Atık Yönetim Planı", "kural_tipi": "bitis_tarihi",
+    "parametreler": { "asamalar": [{ "ad": "Sunum", "gun": 30 }] },
+    "cezai_risk": "var", "hedef_klasor": "12. ENDÜSTRİYEL ATIK YÖNETİM PLANI",
+    "mevzuat_dayanagi": "Atık Yönetimi Yönetmeliği",
+    "aciklama": "Ek-1: il müdürlüğüne sunulur. Ek-2: dosyada tutulur. Varsayılan 30 gün önce; tesise göre değişir."
+  },
+  {
+    "kod": "bkkr", "sira": 60, "ad": "Bağlantı Kalite Kontrol Ruhsatı", "kural_tipi": "bitis_tarihi",
+    "parametreler": { "gecerlilik_ay": 36, "asamalar": [{ "ad": "İşlem başlatma", "ay": 2 }] },
+    "cezai_risk": "var", "hedef_klasor": "10. SU & ATIKSU YÖNETİMİ",
+    "mevzuat_dayanagi": "Belediye atıksu bağlantı yönetmeliği (ASKİ vb.)",
+    "aciklama": "3 yıl geçerli; bitişten 2 ay önce işlem başlatılır."
+  },
+  {
+    "kod": "emisyon", "sira": 70, "ad": "Emisyon Ölçümü", "kural_tipi": "son_islem_periyot",
+    "parametreler": { "periyot_ay": 24, "hazirlik_ay": 3, "aksiyon_adi": "Ölçüme başlama" },
+    "cezai_risk": "var", "hedef_klasor": "11. HAVA YÖNETİMİ",
+    "mevzuat_dayanagi": "Sanayi Kaynaklı Hava Kirliliğinin Kontrolü Yönetmeliği",
+    "aciklama": "2 yılda bir; ölçüm 2 ay + raporlama 1 ay → son tarihten 3 ay önce başlanır."
+  },
+  {
+    "kod": "atiksu_numune", "sira": 80, "ad": "Atıksu İç İzleme Numunesi", "kural_tipi": "son_islem_periyot",
+    "parametreler": { "atiksu_niteligi": "endustriyel", "aksiyon_adi": "Numune alma" },
+    "cezai_risk": "var", "hedef_klasor": "10. SU & ATIKSU YÖNETİMİ",
+    "mevzuat_dayanagi": "SKKY Numune Alma ve Analiz Metotları Tebliği",
+    "aciklama": "Periyot debiye / eşdeğer nüfusa göre tablodan belirlenir."
+  },
+  {
+    "kod": "depo_gazi", "sira": 90, "ad": "Depo Gazı Ölçümü", "kural_tipi": "son_islem_periyot",
+    "parametreler": { "periyot_ay": 1, "aksiyon_adi": "Ölçüm" },
+    "cezai_risk": "var", "hedef_klasor": null,
+    "mevzuat_dayanagi": "Atıkların Düzenli Depolanmasına Dair Yönetmelik EK-5",
+    "aciklama": "İşletme aşamasında aylık, kapatma sonrası 6 ayda bir."
+  },
+  {
+    "kod": "sizinti_suyu", "sira": 100, "ad": "Sızıntı Suyu Analizi", "kural_tipi": "son_islem_periyot",
+    "parametreler": { "periyot_ay": 3, "aksiyon_adi": "Numune alma" },
+    "cezai_risk": "var", "hedef_klasor": null,
+    "mevzuat_dayanagi": "Atıkların Düzenli Depolanmasına Dair Yönetmelik EK-5, Md.25",
+    "aciklama": "İşletme aşamasında 3 ayda bir."
+  },
+  {
+    "kod": "gozlem_kuyusu", "sira": 110, "ad": "Gözlem Kuyusu (Yeraltı Suyu)", "kural_tipi": "son_islem_periyot",
+    "parametreler": { "periyot_ay": 6, "aksiyon_adi": "Ölçüm" },
+    "cezai_risk": "var", "hedef_klasor": null,
+    "mevzuat_dayanagi": "Atıkların Düzenli Depolanmasına Dair Yönetmelik Md.24",
+    "aciklama": "Menbada en az 1, mansapta en az 2 nokta; 6 ayda bir."
+  },
+  {
+    "kod": "ic_tetkik", "sira": 120, "ad": "İç Tetkik", "kural_tipi": "sozlesme_takvimi",
+    "parametreler": { "ilk_gun": 30, "aksiyon_adi": "iç tetkik" },
+    "cezai_risk": "var", "hedef_klasor": "04.İÇ TETKİK RAPORLARI",
+    "mevzuat_dayanagi": "Çevre Yönetimi Hizmetleri Hakkında Yönetmelik",
+    "aciklama": "1. = sözleşme + 30 gün; sonra her sözleşme yıldönümüne kadar bir."
+  },
+  {
+    "kod": "egitim", "sira": 130, "ad": "Eğitim", "kural_tipi": "sozlesme_takvimi",
+    "parametreler": { "ilk_gun": 90, "aksiyon_adi": "eğitim" },
+    "cezai_risk": "dusuk", "hedef_klasor": "05. EĞİTİM DÖKÜMANLARI & TUTANAKLARI",
+    "mevzuat_dayanagi": "Çevre Yönetimi Hizmetleri Hakkında Yönetmelik",
+    "aciklama": "1. = sözleşme + 90 gün; sonra her sözleşme yıldönümüne kadar bir."
+  },
+  {
+    "kod": "bitkisel_atik_yag", "sira": 140, "ad": "Bitkisel Atık Yağ Sözleşmesi", "kural_tipi": "yenilenen_sozlesme",
+    "parametreler": { "sure_yil": 1, "yenileme": true, "yenileme_yil": 1, "hazirlik_gun": 30 },
+    "cezai_risk": "dusuk", "hedef_klasor": "17. BİTKİSEL ATIK YAĞ SÖZLEŞMESİ & FATURALAR",
+    "mevzuat_dayanagi": "Bitkisel Atık Yağların Kontrolü Yönetmeliği",
+    "aciklama": "Yenileme maddesi varsa otomatik uzar; yoksa bitişte sona erer."
+  },
+  {
+    "kod": "tibbi_atik", "sira": 150, "ad": "Tıbbi Atık Sözleşmesi", "kural_tipi": "yenilenen_sozlesme",
+    "parametreler": { "sure_yil": 1, "yenileme": true, "yenileme_yil": 1, "hazirlik_gun": 30 },
+    "cezai_risk": "var", "hedef_klasor": null,
+    "mevzuat_dayanagi": "Tıbbi Atıkların Kontrolü Yönetmeliği",
+    "aciklama": "Genelde yıllık; yenileme maddesi varsa otomatik uzar."
+  },
+  {
+    "kod": "ced_izleme", "sira": 160, "ad": "ÇED İzleme Raporu", "kural_tipi": "donemsel_rapor",
+    "parametreler": { "periyot_ay": 6, "sunum_gun": 15 },
+    "cezai_risk": "yuksek", "hedef_klasor": "06.ÇED BELGELERİ",
+    "mevzuat_dayanagi": "ÇED Yönetmeliği",
+    "aciklama": "Dönem sonu + sunum süresi içinde rapor sunulur."
+  },
+  {
+    "kod": "atik_beyani", "sira": 170, "ad": "Atık Beyanı (TABS)", "kural_tipi": "yillik_sabit_tarih",
+    "parametreler": { "ay": 3, "gun_no": 31, "hazirlik_gun": 30, "aksiyon_adi": "Beyan" },
+    "cezai_risk": "var", "hedef_klasor": "14. TEHLİKELİ & TEHKLİKESİZ ATIK BEYANI",
+    "mevzuat_dayanagi": "Atık Yönetimi Yönetmeliği",
+    "aciklama": "Biten yılın beyanı 31 Mart'a kadar. Tehlikeli atık 180 gün depolanabilir: Mayıs ve Kasım'da çıkış hatırlatması."
+  }
+]

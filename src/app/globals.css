@@ -1,0 +1,45 @@
+@import "tailwindcss";
+@import "@fontsource/ibm-plex-sans/400.css";
+@import "@fontsource/ibm-plex-sans/500.css";
+@import "@fontsource/ibm-plex-sans/600.css";
+@import "@fontsource/ibm-plex-mono/400.css";
+@import "@fontsource/ibm-plex-mono/500.css";
+
+/* Greentask renk ve yazı tokenları (mockup ile aynı) */
+@theme {
+  --font-sans: "IBM Plex Sans", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+
+  --color-zemin: #f4f5f2;
+  --color-yuzey: #ffffff;
+  --color-murekkep: #1c2321;
+  --color-murekkep-2: #3f4743;
+  --color-soluk: #5b635e;
+  --color-cizgi: #dde1da;
+  --color-cizgi-ince: #eef0ec;
+  --color-yesil: #1f6b4f;
+  --color-yesil-koyu: #134733;
+  --color-yesil-acik: #e6f0ea;
+
+  --color-kirmizi-zemin: #fbe4e1;
+  --color-kirmizi: #9b1c12;
+  --color-turuncu-zemin: #fceBd7;
+  --color-turuncu: #8a3b00;
+  --color-gri-zemin: #ecefea;
+  --color-gri: #2f3833;
+  --color-mavi-zemin: #e3edf7;
+  --color-mavi: #1d4f7a;
+}
+
+@layer base {
+  body {
+    background: var(--color-zemin);
+    color: var(--color-murekkep);
+  }
+  a {
+    color: var(--color-yesil);
+  }
+  a:hover {
+    color: var(--color-yesil-koyu);
+  }
+}
