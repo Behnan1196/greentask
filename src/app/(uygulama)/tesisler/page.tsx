@@ -11,9 +11,10 @@ export default async function Tesisler(props: PageProps<'/tesisler'>) {
   const { depo } = await oturumuDogrula();
   const sp = await props.searchParams;
   const ara = typeof sp.ara === 'string' ? sp.ara.trim() : '';
+  const pasifler = sp.pasif === '1';
 
   const [tesisler, turler, kayitlar, olaylar] = await Promise.all([
-    depo.tesisler(),
+    depo.tesisler({ pasiflerDahil: pasifler }),
     depo.turler(),
     depo.yukumlulukler(),
     depo.olaylar(),
@@ -44,8 +45,17 @@ export default async function Tesisler(props: PageProps<'/tesisler'>) {
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div className="flex flex-col gap-1.5">
           <h1 className="text-3xl font-semibold tracking-tight">Tesisler</h1>
-          <span className="text-sm text-murekkep-2">{tesisler.length} aktif tesis</span>
+          <span className="text-sm text-murekkep-2">
+            {tesisler.filter((t) => t.aktif).length} aktif tesis ·{' '}
+            <Link href={pasifler ? '/tesisler' : '/tesisler?pasif=1'} className="no-underline">
+              {pasifler ? 'pasifleri gizle' : 'pasifleri de göster'}
+            </Link>
+          </span>
         </div>
+        <div className="flex flex-wrap gap-2">
+        <Link href="/tesisler/yeni" className="inline-flex min-h-11 items-center rounded-lg bg-yesil px-4 text-sm font-semibold text-white no-underline hover:bg-yesil-koyu">
+          + Yeni tesis
+        </Link>
         <form className="flex gap-2" action="/tesisler">
           <label htmlFor="ara" className="sr-only">
             Tesis ara
@@ -59,6 +69,7 @@ export default async function Tesisler(props: PageProps<'/tesisler'>) {
           />
           <button className="min-h-11 rounded-lg border border-[#c9cec6] bg-white px-4 text-sm">Ara</button>
         </form>
+        </div>
       </header>
       <section className="overflow-x-auto rounded-xl border border-cizgi bg-yuzey">
         <table className="w-full min-w-[820px] border-collapse text-sm">
@@ -78,6 +89,7 @@ export default async function Tesisler(props: PageProps<'/tesisler'>) {
                 <td className="px-5 py-3">
                   <Link href={`/tesisler/${t.gt_kod}`} className="font-medium no-underline">
                     <span className="font-mono text-xs text-soluk">{t.gt_kod}</span> {t.kisa_ad}
+                    {!t.aktif && <span className="ml-2 rounded bg-kirmizi-zemin px-1.5 py-0.5 text-xs text-kirmizi">pasif</span>}
                   </Link>
                   {t.firma_grubu && <span className="block text-xs text-soluk">{t.firma_grubu}</span>}
                 </td>

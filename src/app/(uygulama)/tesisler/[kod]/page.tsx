@@ -10,7 +10,19 @@ import { etkilenenTesisler, tesisMevzuati } from '@/lib/mevzuat/etki';
 import { PLAN_DURUMU } from '@/lib/plan/durum';
 import { ZIYARET_DURUMU } from '@/lib/saha/durum';
 import type { Kullanici } from '@/lib/veri/tipler';
-import { olayEkle, olaySil, tesisSorumlusuKaydet, yukumlulukKaydet } from './eylemler';
+import { KisiAlanlariFormu, TesisAlanlariFormu } from '../tesis-formu';
+import {
+  kisiKaydet,
+  kisiSil,
+  olayEkle,
+  olaySil,
+  tesisAktiflik,
+  tesisBilgileriKaydet,
+  tesisSorumlusuKaydet,
+  yukumlulukEkle,
+  yukumlulukKaydet,
+  yukumlulukSil,
+} from './eylemler';
 
 export async function generateMetadata(props: PageProps<'/tesisler/[kod]'>): Promise<Metadata> {
   const { kod } = await props.params;
@@ -158,6 +170,18 @@ function YukumlulukSatiri({ s, gtKod, ekip }: { s: TerminSatiri; gtKod: string; 
             </label>
             <button className={`${BUTON} border border-[#c9cec6] bg-white`}>Ekle</button>
           </form>
+          <details className="border-t border-cizgi pt-3">
+            <summary className="cursor-pointer text-xs text-soluk">Kaydı sil</summary>
+            <form action={yukumlulukSil} className="mt-2 flex flex-wrap items-center gap-3">
+              <input type="hidden" name="id" value={s.kayit.id} />
+              <input type="hidden" name="gt_kod" value={gtKod} />
+              <label className="flex items-center gap-2 text-xs text-murekkep-2">
+                <input type="checkbox" name="onay" required className="h-4 w-4 accent-kirmizi" />
+                Kayıt ve geçmişi silinsin (artık takip edilmeyecekse silmek yerine durumu “Kapsam dışı” yapın)
+              </label>
+              <button className="min-h-8 rounded-md border border-kirmizi bg-white px-2.5 text-xs text-kirmizi">Sil</button>
+            </form>
+          </details>
         </div>
       </div>
     </details>
@@ -202,6 +226,7 @@ export default async function TesisKarti(props: PageProps<'/tesisler/[kod]'>) {
           {tesis.grup_kod && <span className="rounded-md bg-yesil-acik px-2 py-0.5 text-sm text-yesil-koyu">{tesis.grup_notu ?? tesis.grup_kod}</span>}
           {tesis.sinif && <span className="rounded-md bg-gri-zemin px-2 py-0.5 text-sm text-gri">{tesis.sinif}</span>}
           {tesis.firma_grubu && <span className="rounded-md bg-gri-zemin px-2 py-0.5 text-sm text-gri">{tesis.firma_grubu}</span>}
+          {!tesis.aktif && <span className="rounded-md bg-kirmizi-zemin px-2 py-0.5 text-sm font-semibold text-kirmizi">Pasif</span>}
         </div>
         <h1 className="text-3xl font-semibold tracking-tight">{tesis.kisa_ad}</h1>
         <p className="text-sm text-murekkep-2">
@@ -212,6 +237,27 @@ export default async function TesisKarti(props: PageProps<'/tesisler/[kod]'>) {
           {tesis.sozlesme_kapsami && ` · ${tesis.sozlesme_kapsami}`}
           {tesis.izin_lisans_konusu && ` · İzin konusu: ${tesis.izin_lisans_konusu}`}
         </p>
+        {tesis.notlar && <p className="text-sm text-murekkep-2">{tesis.notlar}</p>}
+        <details className="rounded-xl border border-cizgi bg-yuzey px-5 py-3">
+          <summary className="cursor-pointer text-sm font-semibold">Tesis bilgilerini düzenle</summary>
+          <form action={tesisBilgileriKaydet} className="mt-3 grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3">
+            <input type="hidden" name="tesis_id" value={tesis.id} />
+            <input type="hidden" name="gt_kod" value={tesis.gt_kod} />
+            <TesisAlanlariFormu t={tesis} gruplar={gruplar} />
+            <button className={`${BUTON} self-end justify-self-start bg-yesil font-semibold text-white hover:bg-yesil-koyu`}>Kaydet</button>
+          </form>
+          <form action={tesisAktiflik} className="mt-4 flex flex-wrap items-center gap-3 border-t border-cizgi pt-3">
+            <input type="hidden" name="tesis_id" value={tesis.id} />
+            <input type="hidden" name="gt_kod" value={tesis.gt_kod} />
+            <input type="hidden" name="aktif" value={tesis.aktif ? 'false' : 'true'} />
+            <span className="text-xs text-soluk">
+              {tesis.aktif
+                ? 'Sözleşmesi biten tesisi pasife alın: listelerden, kokpitten ve takvimlerden düşer, kayıtları korunur.'
+                : 'Bu tesis pasif; listelerde ve kokpitte görünmüyor.'}
+            </span>
+            <button className={`${BUTON} border border-[#c9cec6] bg-white`}>{tesis.aktif ? 'Pasife al' : 'Yeniden aktifleştir'}</button>
+          </form>
+        </details>
       </header>
 
       <div className="flex flex-wrap items-start gap-6">
@@ -231,6 +277,30 @@ export default async function TesisKarti(props: PageProps<'/tesisler/[kod]'>) {
               ))}
             </>
           )}
+          {!terminler.length && <p className="border-t border-cizgi-ince px-5 py-4 text-sm text-soluk">Bu tesiste henüz izlenen yükümlülük yok.</p>}
+          <form action={yukumlulukEkle} className="flex flex-wrap items-end gap-2 border-t border-cizgi bg-[#fafbf9] px-5 py-4">
+            <input type="hidden" name="tesis_id" value={tesis.id} />
+            <input type="hidden" name="gt_kod" value={tesis.gt_kod} />
+            <label className="flex min-w-0 flex-[2_1_240px] flex-col gap-1 text-sm">
+              Yükümlülük ekle
+              <select name="tur_id" required defaultValue="" className={GIRDI}>
+                <option value="" disabled>
+                  Tür seçin…
+                </option>
+                {turler.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.ad}
+                    {kayitlar.some((k) => k.tur_id === t.id) ? ' (zaten var — ikinci kayıt için etiket girin)' : ''}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="flex min-w-0 flex-[1_1_180px] flex-col gap-1 text-sm">
+              Etiket (isteğe bağlı)
+              <input name="etiket" placeholder="Örn. Baca 2, Elektrik üretim" className={GIRDI} />
+            </label>
+            <button className={`${BUTON} border border-[#c9cec6] bg-white`}>Ekle</button>
+          </form>
         </section>
 
         <aside className="flex min-w-0 flex-[1_1_280px] flex-col gap-4">
@@ -289,7 +359,7 @@ export default async function TesisKarti(props: PageProps<'/tesisler/[kod]'>) {
           <section className="flex flex-col gap-3.5 rounded-xl border border-cizgi bg-yuzey px-5 py-4">
             <h2 className="text-base font-semibold">Tesis yetkilileri</h2>
             {kisiler.map((k) => (
-              <div key={k.id} className="flex flex-col gap-0.5">
+              <div key={k.id} className="flex flex-col gap-0.5 border-b border-cizgi-ince pb-3 last:border-0">
                 <span className="text-sm font-semibold">
                   {k.ad_soyad}
                   {k.imza_yetkisi && <span className="ml-2 rounded bg-yesil-acik px-1.5 py-0.5 text-xs font-medium text-yesil-koyu">imza</span>}
@@ -301,9 +371,37 @@ export default async function TesisKarti(props: PageProps<'/tesisler/[kod]'>) {
                     {k.telefon}
                   </a>
                 )}
+                {k.eposta && (
+                  <a href={`mailto:${k.eposta}`} className="text-xs no-underline">
+                    {k.eposta}
+                  </a>
+                )}
+                <details className="mt-1">
+                  <summary className="cursor-pointer text-xs text-soluk">Düzenle</summary>
+                  <form action={kisiKaydet} className="mt-2 flex flex-col gap-2">
+                    <input type="hidden" name="id" value={k.id} />
+                    <input type="hidden" name="gt_kod" value={tesis.gt_kod} />
+                    <KisiAlanlariFormu k={k} />
+                    <button className={`${BUTON} self-start bg-yesil font-semibold text-white hover:bg-yesil-koyu`}>Kaydet</button>
+                  </form>
+                  <form action={kisiSil} className="mt-2">
+                    <input type="hidden" name="id" value={k.id} />
+                    <input type="hidden" name="gt_kod" value={tesis.gt_kod} />
+                    <button className="text-xs text-soluk hover:text-kirmizi">Bu kişiyi sil</button>
+                  </form>
+                </details>
               </div>
             ))}
             {!kisiler.length && <p className="text-sm text-soluk">Kayıtlı kişi yok.</p>}
+            <details>
+              <summary className="cursor-pointer text-sm text-yesil">+ Yetkili ekle</summary>
+              <form action={kisiKaydet} className="mt-2 flex flex-col gap-2">
+                <input type="hidden" name="tesis_id" value={tesis.id} />
+                <input type="hidden" name="gt_kod" value={tesis.gt_kod} />
+                <KisiAlanlariFormu />
+                <button className={`${BUTON} self-start bg-yesil font-semibold text-white hover:bg-yesil-koyu`}>Ekle</button>
+              </form>
+            </details>
           </section>
           <section className="flex flex-col gap-2 rounded-xl border border-cizgi bg-yuzey px-5 py-4">
             <div className="flex items-center justify-between gap-2">

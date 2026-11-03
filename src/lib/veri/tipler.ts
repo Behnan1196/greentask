@@ -4,6 +4,8 @@ export type CezaiRisk = 'yok' | 'dusuk' | 'var' | 'yuksek';
 
 export type Kullanici = { id: string; ad_soyad: string; eposta: string | null; rol: 'yonetici' | 'muhendis' };
 
+export type Profil = Kullanici & { aktif: boolean };
+
 export type Tesis = {
   id: string;
   gt_kod: string;
@@ -109,6 +111,28 @@ export type Mevzuat = {
 export type MatrisHucresi = { mevzuat_id: string; grup_kod: string; uygulama: 'X' | 'K' };
 
 export type SektorGrubu = { kod: string; ad: string; aciklama: string | null };
+
+/** Tesis kartında düzenlenebilen alanlar (gt_kod ve sorumlu ayrı yönetilir). */
+export type TesisAlanlari = Pick<
+  Tesis,
+  | 'kisa_ad'
+  | 'resmi_unvan'
+  | 'il'
+  | 'sinif'
+  | 'nace_kodlari'
+  | 'grup_kod'
+  | 'grup_notu'
+  | 'firma_grubu'
+  | 'sozlesme_tarihi'
+  | 'sozlesme_kapsami'
+  | 'izin_lisans_konusu'
+  | 'mevzuat_notu'
+  | 'notlar'
+>;
+
+export type KisiAlanlari = Omit<Kisi, 'id' | 'tesis_id'>;
+
+export type GorevAlanlari = Partial<Pick<Gorev, 'baslik' | 'aciklama' | 'sorumlu_id' | 'son_tarih'>>;
 
 export type YukumlulukGuncelleme = Partial<
   Pick<TesisYukumlulukSatiri, 'durum' | 'gecerlilik_bitis' | 'belge_tarihi' | 'son_islem' | 'baslangic' | 'notlar' | 'sorumlu_id'>
@@ -283,7 +307,19 @@ export type TakvimVerisi = {
 /** Veri erişim katmanı: Supabase (gerçek) ve yerel Postgres (yalnızca geliştirme/demo) aynı arayüzü uygular. */
 export interface Depo {
   kullanici(): Promise<Kullanici | null>;
-  tesisler(): Promise<Tesis[]>;
+  /** Varsayılan: yalnızca aktif tesisler. */
+  tesisler(secenek?: { pasiflerDahil?: boolean }): Promise<Tesis[]>;
+  tesisEkle(gtKod: string, alanlar: TesisAlanlari, sorumluId: string | null): Promise<string>;
+  tesisGuncelle(id: string, alanlar: Partial<TesisAlanlari & { aktif: boolean }>): Promise<void>;
+  kisiEkle(tesisId: string, k: KisiAlanlari): Promise<void>;
+  kisiGuncelle(id: string, k: KisiAlanlari): Promise<void>;
+  kisiSil(id: string): Promise<void>;
+  yukumlulukEkle(y: { tesis_id: string; tur_id: string; etiket: string }): Promise<void>;
+  yukumlulukSil(id: string): Promise<void>;
+  gorevGuncelle(id: string, alanlar: GorevAlanlari): Promise<void>;
+  profiller(): Promise<Profil[]>;
+  profilGuncelle(id: string, alanlar: Partial<Pick<Profil, 'ad_soyad' | 'rol' | 'aktif'>>): Promise<void>;
+  sektorGrubuKaydet(g: SektorGrubu): Promise<void>;
   tesis(gtKod: string): Promise<Tesis | null>;
   kisiler(tesisId: string): Promise<Kisi[]>;
   turler(): Promise<YukumlulukTuruSatiri[]>;

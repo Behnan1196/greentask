@@ -90,3 +90,15 @@ export async function gorevDurumunuDegistir(form: FormData) {
   await depo.gorevDurumu(al(form, 'id', UUID, true)!, durum);
   yenile();
 }
+
+/** Görevin başlığını, açıklamasını, sorumlusunu ve son tarihini değiştirir. */
+export async function gorevGuncelle(form: FormData) {
+  const { depo } = await oturumuDogrula();
+  await depo.gorevGuncelle(al(form, 'id', UUID, true)!, {
+    baslik: al(form, 'baslik', undefined, true)!.slice(0, 300),
+    aciklama: al(form, 'aciklama'),
+    sorumlu_id: al(form, 'sorumlu_id', UUID),
+    son_tarih: al(form, 'son_tarih', TARIH),
+  });
+  yenile();
+}

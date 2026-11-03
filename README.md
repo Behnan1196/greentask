@@ -36,7 +36,7 @@ npx supabase link --project-ref <proje-ref>          # ref: proje URL'sindeki ko
 npx supabase db push --include-seed                  # şemayı kurar, veriyi yükler
 ```
 `seed.sql` idempotenttir: Excel güncellenip yeniden çalıştırılırsa kayıtlar güncellenir, mükerrer kayıt oluşmaz.
-*Not: Sisteme veri girişi başladıktan sonra Excel'den yeniden aktarım yapmayın. Excel'deki eski tarih, sistemde güncellenmiş tarihin üzerine yazar.*
+*Not: Sisteme veri girişi başladıktan sonra Excel'den yeniden aktarım yapmayın. Excel'deki eski tarih, sistemde güncellenmiş tarihin üzerine yazar. Excel yalnızca ilk yükleme içindir; sonrasında tesis, kişi ve yükümlülükler uygulamadan yönetilir.*
 
 ### 3. Kullanıcılar
 Önce bir kez, e-posta bağlantılarını uygulamaya yönlendirin:
@@ -52,6 +52,7 @@ Sonra:
    ```sql
    update public.profiller set rol = 'yonetici', ad_soyad = 'Ad Soyad' where eposta = 'kisi@ornek.com';
    ```
+   Sonraki rol ve aktiflik değişiklikleri uygulamadaki **Ayarlar** sayfasından yapılır.
    Yönetici kural kataloğunu ve kullanıcı rollerini değiştirebilir. Mühendisler tesis verisini okuyup yazabilir.
    Ayrılan bir çalışanın erişimini kapatmak için: `update public.profiller set aktif = false where eposta = '…';`
 
@@ -112,6 +113,7 @@ Ayrıntılar: [docs/KURAL_KATALOGU.md](docs/KURAL_KATALOGU.md).
 
 ## Yol haritası
 - [x] Şema, RLS, Excel aktarımı, kural motoru, Kokpit, Tesis kartı
+- [x] Uygulama içinden veri yönetimi: yeni tesis (grubuna göre önerilen yükümlülüklerle), tesis bilgileri, pasife alma, yetkililer, yükümlülük ekle/sil, görev düzenleme, Ayarlar (ekip rolleri, sektör grupları)
 - [x] Benim İşlerim: tesis/yükümlülük sorumlusu, elle görev, kişisel takvim aboneliği (.ics)
 - [x] Toplantı & Görevler: gündem (devreden görevler + sistemin işaretledikleri), kararlar → görev, tutanak (.md), görev panosu
 - [ ] Müşteri hatırlatma e-postaları (onaylı gönderim)

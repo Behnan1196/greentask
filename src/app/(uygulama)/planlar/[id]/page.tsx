@@ -283,6 +283,7 @@ export default async function PlanSayfasi(props: PageProps<'/planlar/[id]'>) {
                 <div className="divide-y divide-cizgi-ince">
                   {gorevler.map((g) => (
                     <GorevSatiri
+                      ekip={ekip}
                       key={g.id}
                       g={g}
                       bugun={gun}

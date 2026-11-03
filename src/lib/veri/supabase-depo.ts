@@ -22,8 +22,54 @@ export function supabaseDepo(db: Istemci): Depo {
       if (!p.data || !p.data.aktif) return null;
       return { id: p.data.id, ad_soyad: p.data.ad_soyad, eposta: p.data.eposta, rol: p.data.rol };
     },
-    async tesisler() {
-      return hataKontrol(await db.from('tesisler').select('*').eq('aktif', true).order('gt_kod'));
+    async tesisler(secenek = {}) {
+      let q = db.from('tesisler').select('*').order('gt_kod');
+      if (!secenek.pasiflerDahil) q = q.eq('aktif', true);
+      return hataKontrol(await q);
+    },
+    async tesisEkle(gt_kod, alanlar, sorumlu_id) {
+      const r = await db.from('tesisler').insert({ gt_kod, ...alanlar, sorumlu_id }).select('id').single();
+      if (r.error) throw new Error(r.error.code === '23505' ? `${gt_kod} kodu kullanılıyor` : `Veritabanı hatası: ${r.error.message}`);
+      return (r.data as { id: string }).id;
+    },
+    async tesisGuncelle(id, alanlar) {
+      hataKontrol(await db.from('tesisler').update(alanlar).eq('id', id).select('id').single());
+    },
+    async kisiEkle(tesis_id, k) {
+      hataKontrol(await db.from('kisiler').insert({ tesis_id, ...k }).select('id').single());
+    },
+    async kisiGuncelle(id, k) {
+      hataKontrol(await db.from('kisiler').update(k).eq('id', id).select('id').single());
+    },
+    async kisiSil(id) {
+      hataKontrol(await db.from('kisiler').delete().eq('id', id).select('id').single());
+    },
+    async yukumlulukEkle(y) {
+      const r = await db.from('tesis_yukumlulukleri').insert(y).select('id').single();
+      if (r.error) {
+        throw new Error(r.error.code === '23505' ? 'Bu tesiste aynı türde ve aynı etiketle bir kayıt zaten var' : `Veritabanı hatası: ${r.error.message}`);
+      }
+    },
+    async yukumlulukSil(id) {
+      hataKontrol(await db.from('tesis_yukumlulukleri').delete().eq('id', id).select('id').single());
+    },
+    async gorevGuncelle(id, alanlar) {
+      hataKontrol(await db.from('gorevler').update(alanlar).eq('id', id).select('id').single());
+    },
+    async profiller() {
+      return hataKontrol(
+        await db.from('profiller').select('id, ad_soyad, eposta, rol, aktif').order('aktif', { ascending: false }).order('ad_soyad'),
+      );
+    },
+    async profilGuncelle(id, alanlar) {
+      const r = await db.from('profiller').update(alanlar).eq('id', id).select('id');
+      if (r.error) throw new Error(`Veritabanı hatası: ${r.error.message}`);
+      if (!r.data?.length) throw new Error('Bu değişiklik için yönetici yetkisi gerekiyor');
+    },
+    async sektorGrubuKaydet(g) {
+      const r = await db.from('sektor_gruplari').upsert(g).select('kod');
+      if (r.error) throw new Error(`Veritabanı hatası: ${r.error.message}`);
+      if (!r.data?.length) throw new Error('Sektör gruplarını yalnızca yönetici değiştirebilir');
     },
     async tesis(gtKod) {
       return hataKontrol(await db.from('tesisler').select('*').eq('gt_kod', gtKod).maybeSingle());

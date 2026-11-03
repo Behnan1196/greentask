@@ -1,6 +1,7 @@
 import { gorevDurumunuDegistir } from '@/app/(uygulama)/toplantilar/eylemler';
 import { gunFarki, trTarih } from '@/lib/termin/tarih';
-import type { Gorev } from '@/lib/veri/tipler';
+import type { Gorev, Kullanici } from '@/lib/veri/tipler';
+import { GorevDuzenle } from './gorev-duzenle';
 
 const DURUM = {
   acik: { ad: 'Açık', sinif: 'bg-gri-zemin text-gri' },
@@ -12,7 +13,7 @@ const DURUM = {
 const KUCUK_BUTON = 'min-h-8 rounded-md border border-[#c9cec6] bg-white px-2.5 text-xs';
 
 /** Görev satırı: durum, kişi, tarih ve hızlı durum değiştirme. */
-export function GorevSatiri({ g, bugun, kisi, ek }: { g: Gorev; bugun: string; kisi?: string; ek?: string }) {
+export function GorevSatiri({ g, bugun, kisi, ek, ekip }: { g: Gorev; bugun: string; kisi?: string; ek?: string; ekip?: Kullanici[] }) {
   const kalan = g.son_tarih ? gunFarki(bugun, g.son_tarih) : null;
   const gecikti = kalan != null && kalan < 0 && (g.durum === 'acik' || g.durum === 'devam');
   const d = gecikti ? { ad: 'Gecikti', sinif: 'bg-kirmizi-zemin text-kirmizi' } : DURUM[g.durum];
@@ -42,6 +43,7 @@ export function GorevSatiri({ g, bugun, kisi, ek }: { g: Gorev; bugun: string; k
           </form>
         </div>
       )}
+      {ekip && <GorevDuzenle g={g} ekip={ekip} />}
     </div>
   );
 }

@@ -51,6 +51,7 @@ export default async function GorevPanosu() {
                   <GorevSatiri
                     key={g.id}
                     g={g}
+                    ekip={ekip}
                     bugun={gun}
                     ek={[
                       g.toplanti_id ? `${trTarih(toplantiTarihi.get(g.toplanti_id) ?? null)} toplantısı` : 'Elle',

@@ -60,8 +60,64 @@ export function demoDepo(): Depo {
     async kullanici() {
       return demoKullanici();
     },
-    async tesisler() {
-      return q(`select ${tarihSql('t', TESIS)} from tesisler t where aktif order by gt_kod`);
+    async tesisler(secenek = {}) {
+      return q(`select ${tarihSql('t', TESIS)} from tesisler t ${secenek.pasiflerDahil ? '' : 'where aktif'} order by gt_kod`);
+    },
+    async tesisEkle(gtKod, alanlar, sorumluId) {
+      const k = Object.keys(alanlar);
+      const yer = k.map((_, i) => '$' + (i + 3)).join(', ');
+      try {
+        const r = await q<{ id: string }>(`insert into tesisler (gt_kod, sorumlu_id, ${k.join(', ')}) values ($1, $2, ${yer}) returning id`, [
+          gtKod,
+          sorumluId,
+          ...k.map((a) => (alanlar as Record<string, unknown>)[a]),
+        ]);
+        return r[0].id;
+      } catch (e) {
+        if ((e as { code?: string }).code === '23505') throw new Error(`${gtKod} kodu kullanılıyor`);
+        throw e;
+      }
+    },
+    async tesisGuncelle(id, alanlar) {
+      await guncelle('tesisler', id, alanlar);
+    },
+    async kisiEkle(tesisId, k) {
+      await q(
+        'insert into kisiler (tesis_id, ad_soyad, gorev, sorumluluklar, telefon, eposta, imza_yetkisi, profil_notu) values ($1, $2, $3, $4, $5, $6, $7, $8)',
+        [tesisId, k.ad_soyad, k.gorev, k.sorumluluklar, k.telefon, k.eposta, k.imza_yetkisi, k.profil_notu],
+      );
+    },
+    async kisiGuncelle(id, k) {
+      await guncelle('kisiler', id, k);
+    },
+    async kisiSil(id) {
+      await q('delete from kisiler where id = $1', [id]);
+    },
+    async yukumlulukEkle(y) {
+      try {
+        await q('insert into tesis_yukumlulukleri (tesis_id, tur_id, etiket) values ($1, $2, $3)', [y.tesis_id, y.tur_id, y.etiket]);
+      } catch (e) {
+        if ((e as { code?: string }).code === '23505') throw new Error('Bu tesiste aynı türde ve aynı etiketle bir kayıt zaten var');
+        throw e;
+      }
+    },
+    async yukumlulukSil(id) {
+      await q('delete from tesis_yukumlulukleri where id = $1', [id]);
+    },
+    async gorevGuncelle(id, alanlar) {
+      await guncelle('gorevler', id, alanlar);
+    },
+    async profiller() {
+      return q('select id, ad_soyad, eposta, rol, aktif from profiller order by aktif desc, ad_soyad');
+    },
+    async profilGuncelle(id, alanlar) {
+      await guncelle('profiller', id, alanlar);
+    },
+    async sektorGrubuKaydet(g) {
+      await q(
+        'insert into sektor_gruplari (kod, ad, aciklama) values ($1, $2, $3) on conflict (kod) do update set ad = excluded.ad, aciklama = excluded.aciklama',
+        [g.kod, g.ad, g.aciklama],
+      );
     },
     async tesis(gtKod) {
       return (await q(`select ${tarihSql('t', TESIS)} from tesisler t where gt_kod = $1`, [gtKod]))[0] as never ?? null;

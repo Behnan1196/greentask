@@ -6,6 +6,7 @@ import type { TerminDurumu } from '@/lib/termin/motor';
 import { bugun, gunFarki, trTarih, trUzunTarih } from '@/lib/termin/tarih';
 import { oturumuDogrula } from '@/lib/veri/depo';
 import { sorumlusu, terminleriHesapla, type TerminSatiri } from '@/lib/veri/terminler';
+import { GorevDuzenle } from '@/components/gorev-duzenle';
 import { gorevDurumu, gorevEkle, takvimAnahtariniYenile } from './eylemler';
 import { KopyalaKutusu } from './kopyala';
 
@@ -156,6 +157,7 @@ export default async function BenimIslerim() {
                           {g.son_tarih ? `${trTarih(g.son_tarih)}${kalan != null && kalan < 0 ? ` · ${-kalan} gün geçti` : ''}` : 'Tarihsiz'}
                           {tesis && ` · ${tesis.gt_kod} ${tesis.kisa_ad}`}
                         </p>
+                        <GorevDuzenle g={g} ekip={ekip} />
                       </div>
                     </li>
                   );

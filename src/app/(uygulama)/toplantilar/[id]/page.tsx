@@ -102,6 +102,7 @@ export default async function ToplantiSayfasi(props: PageProps<'/toplantilar/[id
                     g={g}
                     bugun={gun}
                     kisi={adi.get(g.sorumlu_id ?? '') ?? 'Atanmamış'}
+                    ekip={ekip}
                     ek={`${trTarih(toplantiTarihi.get(g.toplanti_id!) ?? null)} toplantısı${g.tesis_id ? ` · ${tesisAdi.get(g.tesis_id)}` : ''}`}
                   />
                 ))}
@@ -141,7 +142,7 @@ export default async function ToplantiSayfasi(props: PageProps<'/toplantilar/[id
                   </form>
                   <div className="divide-y divide-cizgi-ince border-t border-cizgi pt-1">
                     {mg.map((g) => (
-                      <GorevSatiri key={g.id} g={g} bugun={gun} kisi={adi.get(g.sorumlu_id ?? '') ?? 'Atanmamış'} />
+                      <GorevSatiri key={g.id} g={g} bugun={gun} kisi={adi.get(g.sorumlu_id ?? '') ?? 'Atanmamış'} ekip={ekip} />
                     ))}
                   </div>
                   <form action={maddedenGorev} className="flex flex-wrap items-end gap-2">
