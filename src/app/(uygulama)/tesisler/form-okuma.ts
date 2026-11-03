@@ -43,6 +43,7 @@ export function kisiAlanlari(form: FormData): KisiAlanlari {
     eposta: al(form, 'eposta'),
     imza_yetkisi: form.get('imza_yetkisi') === 'on',
     profil_notu: al(form, 'profil_notu'),
+    dogum_gunu: al(form, 'dogum_gunu', TARIH),
   };
 }
 

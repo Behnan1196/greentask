@@ -5,7 +5,8 @@ import { DurumRozeti, KalanGun } from '@/components/rozetler';
 import type { TerminDurumu } from '@/lib/termin/motor';
 import { bugun, gunFarki, trTarih, trUzunTarih } from '@/lib/termin/tarih';
 import { oturumuDogrula } from '@/lib/veri/depo';
-import { sorumlusu, terminleriHesapla, type TerminSatiri } from '@/lib/veri/terminler';
+import { TEMAS_ESIGI, sonTemaslar, yaklasanDogumGunleri } from '@/lib/musteri/temas';
+import { imzaliNushaBekleyen, sorumlusu, terminleriHesapla, type TerminSatiri } from '@/lib/veri/terminler';
 import { GorevDuzenle } from '@/components/gorev-duzenle';
 import { gorevDurumu, gorevEkle, takvimAnahtariniYenile } from './eylemler';
 import { KopyalaKutusu } from './kopyala';
@@ -23,7 +24,8 @@ const GRUPLAR: { baslik: string; durumlar: TerminDurumu[]; acik: boolean }[] = [
 
 const GIRDI = 'min-h-10 rounded-lg border border-[#c9cec6] bg-white px-2.5 text-sm';
 
-function TerminKarti({ s }: { s: TerminSatiri }) {
+function TerminKarti({ s, gun }: { s: TerminSatiri; gun: string }) {
+  const imza = imzaliNushaBekleyen(s, gun);
   return (
     <li className="flex flex-wrap items-start justify-between gap-3 border-t border-cizgi-ince px-5 py-3">
       <div className="min-w-0 flex-1">
@@ -42,7 +44,12 @@ function TerminKarti({ s }: { s: TerminSatiri }) {
           {s.sonuc.aksiyonAdi
             ? `${s.sonuc.aksiyonAdi}: ${trTarih(s.sonuc.aksiyonTarihi)} · son gün ${trTarih(s.sonuc.sonTarih)}`
             : s.sonuc.aciklama}
+          {' · '}
+          <Link href={`/kilavuz/${s.tur.kod}`} className="no-underline">
+            nasıl yapılır?
+          </Link>
         </p>
+        {imza && <p className="text-xs font-semibold text-turuncu">İmzalı nüsha bekleniyor ({trTarih(imza)} işleminden)</p>}
       </div>
       {s.sonuc.kalanGunAksiyon != null ? <KalanGun sonuc={s.sonuc} /> : <DurumRozeti durum={s.sonuc.durum} />}
     </li>
@@ -52,7 +59,7 @@ function TerminKarti({ s }: { s: TerminSatiri }) {
 export default async function BenimIslerim() {
   const { depo, kullanici } = await oturumuDogrula();
   const gun = bugun();
-  const [tesisler, turler, kayitlar, olaylar, gorevler, ekip, anahtar, ziyaretler] = await Promise.all([
+  const [tesisler, turler, kayitlar, olaylar, gorevler, ekip, anahtar, ziyaretler, gorusmeler, kisiler] = await Promise.all([
     depo.tesisler(),
     depo.turler(),
     depo.yukumlulukler(),
@@ -61,7 +68,17 @@ export default async function BenimIslerim() {
     depo.kullanicilar(),
     depo.takvimAnahtari(),
     depo.ziyaretler(),
+    depo.gorusmeler(),
+    depo.kisiler(),
   ]);
+  const tesislerim = tesisler.filter((t) => t.sorumlu_id === kullanici.id);
+  const temas = sonTemaslar(tesislerim, gorusmeler, ziyaretler);
+  const temassiz = tesislerim
+    .map((t) => ({ t, son: temas.get(t.id) ?? null }))
+    .filter((x) => !x.son || gunFarki(x.son, gun) > TEMAS_ESIGI)
+    .sort((a, b) => (a.son ?? '').localeCompare(b.son ?? ''));
+  const tesisimMi = new Set(tesislerim.map((t) => t.id));
+  const dogumGunleri = yaklasanDogumGunleri(kisiler.filter((k) => tesisimMi.has(k.tesis_id)), gun);
   const ziyaretlerim = ziyaretler
     .filter((z) => z.ziyaretci_id === kullanici.id && (z.durum === 'planli' || z.durum === 'yapildi'))
     .sort((a, b) => a.tarih.localeCompare(b.tarih));
@@ -109,7 +126,7 @@ export default async function BenimIslerim() {
                 </summary>
                 <ul>
                   {liste.map((s) => (
-                    <TerminKarti key={s.kayit.id} s={s} />
+                    <TerminKarti key={s.kayit.id} s={s} gun={gun} />
                   ))}
                 </ul>
               </details>
@@ -118,6 +135,33 @@ export default async function BenimIslerim() {
         </section>
 
         <aside className="flex min-w-0 flex-[1_1_320px] flex-col gap-4">
+          {(temassiz.length > 0 || dogumGunleri.length > 0) && (
+            <section className="flex flex-col gap-2 rounded-xl border border-cizgi bg-yuzey px-5 py-4">
+              <h2 className="text-base font-semibold">Müşteri teması</h2>
+              {dogumGunleri.map(({ kisi, tarih, kalan }) => {
+                const t = tesisler.find((x) => x.id === kisi.tesis_id);
+                return (
+                  <Link key={kisi.id} href={`/tesisler/${t?.gt_kod}`} className="flex justify-between gap-2 rounded-lg bg-yesil-acik px-3 py-2 text-sm no-underline">
+                    <span className="text-murekkep">
+                      🎂 {kisi.ad_soyad} <span className="text-soluk">· {t?.kisa_ad}</span>
+                    </span>
+                    <span className="shrink-0 text-yesil-koyu">{kalan === 0 ? 'bugün' : kalan === 1 ? 'yarın' : trTarih(tarih).slice(0, 5)}</span>
+                  </Link>
+                );
+              })}
+              {temassiz.length > 0 && <p className="text-xs text-soluk">{TEMAS_ESIGI} günden uzun süredir görüşülmeyen tesisleriniz:</p>}
+              {temassiz.slice(0, 8).map(({ t, son }) => (
+                <Link key={t.id} href={`/tesisler/${t.gt_kod}`} className="flex justify-between gap-2 text-sm no-underline">
+                  <span>
+                    <span className="font-mono text-xs text-soluk">{t.gt_kod}</span> {t.kisa_ad}
+                  </span>
+                  <span className="shrink-0 text-turuncu">{son ? `${gunFarki(son, gun)} gün` : 'hiç kayıt yok'}</span>
+                </Link>
+              ))}
+              {temassiz.length > 8 && <p className="text-xs text-soluk">+{temassiz.length - 8} tesis daha</p>}
+              <p className="text-xs text-soluk">Görüşmeyi tesis kartındaki “Görüşmeler” kutusuna yazınca listeden düşer.</p>
+            </section>
+          )}
           {ziyaretlerim.length > 0 && (
             <section className="flex flex-col gap-2 rounded-xl border border-cizgi bg-yuzey px-5 py-4">
               <h2 className="text-base font-semibold">Saha ziyaretlerim · {ziyaretlerim.length}</h2>

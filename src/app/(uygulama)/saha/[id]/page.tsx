@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { hazirlikListesi } from '@/lib/saha/hazirlik';
+import { DOSYA_DURUMU, dosyaKalemleri } from '@/lib/saha/dosya';
 import { ONEM, ZIYARET_DURUMU } from '@/lib/saha/durum';
 import { bugun, trTarih } from '@/lib/termin/tarih';
 import { oturumuDogrula } from '@/lib/veri/depo';
@@ -11,6 +12,7 @@ import {
   bulguEkle,
   bulguSil,
   bulgudanGorev,
+  dosyaKontroluKaydet,
   dosyaSil,
   ziyaretDurumu,
   ziyaretMetniKaydet,
@@ -71,6 +73,8 @@ export default async function ZiyaretSayfasi(props: PageProps<'/saha/[id]'>) {
             .map((b) => ({ bulgu: b.bulgu, termin: b.termin, ziyaretTarihi: ziyaretTarihi.get(b.ziyaret_id) ?? '' })),
         })
       : [];
+  const kalemler = dosyaKalemleri(kayitlar, turler);
+  const kontrolSayisi = Object.keys(z.dosya_kontrolu ?? {}).length;
   const karsilayacak = kisiler.filter((k) => k.imza_yetkisi).concat(kisiler.filter((k) => !k.imza_yetkisi)).slice(0, 3);
 
   return (
@@ -340,6 +344,37 @@ export default async function ZiyaretSayfasi(props: PageProps<'/saha/[id]'>) {
                 <input name="duzeltici_faaliyet" placeholder="Tesisin yapması gereken" className={GIRDI} />
               </label>
               <button className={`${ANA} justify-self-start`}>Bulgu ekle</button>
+            </form>
+          </section>
+          <section className="flex flex-col gap-3 rounded-xl border border-cizgi bg-yuzey px-5 py-4">
+            <h2 className="text-base font-semibold">
+              Tesis dosyası kontrolü <span className="text-sm font-normal text-soluk">· {kontrolSayisi} / {kalemler.length} belge işaretlendi</span>
+            </h2>
+            <p className="text-sm text-murekkep-2">Tesisteki fiziksel dosyada her belgenin güncel ve imzalı nüshası var mı? Rapora tablo olarak girer.</p>
+            <form action={dosyaKontroluKaydet} className="flex flex-col gap-2">
+              <input type="hidden" name="id" value={id} />
+              <div className="grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-x-6 gap-y-1.5">
+                {kalemler.map((k) => (
+                  <label key={k.id} className="flex items-center justify-between gap-3 border-b border-cizgi-ince py-1 text-sm">
+                    <span className="min-w-0">{k.ad}</span>
+                    <select name={`dk_${k.id}`} defaultValue={z.dosya_kontrolu?.[k.id] ?? ''} className="min-h-9 shrink-0 rounded-md border border-[#c9cec6] bg-white px-2 text-xs">
+                      <option value="">—</option>
+                      {Object.entries(DOSYA_DURUMU).map(([v, d]) => (
+                        <option key={v} value={v}>
+                          {d.ad}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                ))}
+              </div>
+              {!kalemler.length && <p className="text-sm text-soluk">Bu tesiste takip edilen yükümlülük yok.</p>}
+              <div className="flex flex-wrap gap-2">
+                <button className={BUTON}>Kaydet</button>
+                <button name="bulgu_ekle" value="1" className={BUTON}>
+                  Kaydet ve eksik / imzasızları bulguya ekle
+                </button>
+              </div>
             </form>
           </section>
           <section className="flex flex-col gap-2 rounded-xl border border-cizgi bg-yuzey px-5 py-4">

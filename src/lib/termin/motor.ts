@@ -15,7 +15,7 @@ export type KuralTipi =
   | 'yillik_sabit_tarih';
 
 export type KayitDurumu = 'aktif' | 'muaf' | 'kapsam_disi' | 'beklemede';
-export type OlayTuru = 'gerceklesti' | 'sunuldu' | 'eksiklik_geldi' | 'eksiklik_yanitlandi' | 'onaylandi' | 'not';
+export type OlayTuru = 'gerceklesti' | 'sunuldu' | 'eksiklik_geldi' | 'eksiklik_yanitlandi' | 'onaylandi' | 'imzali_teslim' | 'not';
 
 /** Bir aşama: son tarihten `gun` ya da `ay` önce. */
 export type Asama = { ad: string; gun?: number; ay?: number };
@@ -42,8 +42,10 @@ export type Parametreler = {
   // yillik_sabit_tarih
   ay?: number;
   gun_no?: number;
+  onay_gerekli?: boolean; // dönem, kurum onayı (örn. il müdürlüğü) gelmeden kapanmaz
   // ortak
   aksiyon_adi?: string;
+  imzali_nusha?: boolean; // belge tesise imzalatılır; imzalı nüsha teslim alınana kadar uyarı
 };
 
 export type YukumlulukTuru = {
@@ -94,6 +96,7 @@ const OLAY_METNI: Record<OlayTuru, string> = {
   eksiklik_geldi: 'eksiklik geldi',
   eksiklik_yanitlandi: 'eksikliğe dönüldü',
   onaylandi: 'onaylandı',
+  imzali_teslim: 'imzalı nüsha teslim alındı',
   not: 'not',
 };
 
@@ -188,7 +191,7 @@ function bitisTarihi(p: Parametreler, k: TesisYukumlulugu, bugun: Gun): TerminSo
       durum: 'surecte',
       aciklama: onay
         ? 'Onaylandı — yeni geçerlilik tarihini girin'
-        : `Süreçte · son işlem: ${OLAY_METNI[sonOlay?.tur ?? 'not']} (${trTarih(surec[surec.length - 1])})`,
+        : `Süreçte · son işlem: ${OLAY_METNI[sonOlay?.tur ?? 'not']} (${trTarih(surec[surec.length - 1])}, ${gunFarki(surec[surec.length - 1], bugun)} gün önce)`,
     };
   }
 
@@ -291,6 +294,41 @@ function yillikSabitTarih(p: Parametreler, k: TesisYukumlulugu, bugun: Gun): Ter
   return sonuc(bugun, hedef, aksiyon, p.aksiyon_adi ?? 'Sunum', '');
 }
 
+/**
+ * Onay gerektiren yıllık iş (örn. ÇBS/GİRGİR beyanı ve il müdürlüğü onayı): sunulmuş ama onaylanmamış dönem
+ * "süreçte" kalır ve kaç gündür beklediği gösterilir. Dönem, onay gelince kapanır (onay son tarihten sonra da gelebilir).
+ */
+function yillikOnayli(p: Parametreler, k: TesisYukumlulugu, bugun: Gun): TerminSonucu {
+  const tarihi = (yil: number) => `${yil}-${String(p.ay).padStart(2, '0')}-${String(p.gun_no).padStart(2, '0')}` as Gun;
+  const yil = Number(bugun.slice(0, 4));
+  let hedef = tarihi(yil) >= bugun ? tarihi(yil) : tarihi(yil + 1);
+  const onceki = tarihi(Number(hedef.slice(0, 4)) - 1);
+  const sunulan = olaylar(k, 'sunuldu', 'gerceklesti');
+  const onaylar = olaylar(k, 'onaylandi');
+  const onaylandi = (s: Gun) => onaylar.some((o) => o >= s);
+  const s = sunulan[sunulan.length - 1];
+  if (s && s > gunEkle(onceki, -300) && !onaylandi(s)) {
+    const donem = s > onceki ? hedef : onceki;
+    const eksiklik = olaylar(k, 'eksiklik_geldi').filter((t) => t >= s);
+    const yanit = olaylar(k, 'eksiklik_yanitlandi').filter((t) => t >= s);
+    const sonEksik = eksiklik[eksiklik.length - 1];
+    const bekleyenEksik = sonEksik && !yanit.some((t) => t >= sonEksik);
+    const r = sonuc(bugun, donem, donem, p.aksiyon_adi ?? 'Sunum', '');
+    return {
+      ...r,
+      durum: 'surecte',
+      aciklama: bekleyenEksik
+        ? `Eksiklik bildirildi (${trTarih(sonEksik)}) · ${gunFarki(sonEksik, bugun)} gündür yanıt bekliyor`
+        : `Sunuldu (${trTarih(s)}) · ${gunFarki(s, bugun)} gündür onay bekleniyor`,
+    };
+  }
+  // Bu dönemin sunumu yapılıp onaylandıysa bir sonraki yıla geç
+  if (sunulan.some((t) => t > onceki && t <= hedef && onaylandi(t))) hedef = tarihi(Number(hedef.slice(0, 4)) + 1);
+  const aksiyon = gunEkle(hedef, -(p.hazirlik_gun ?? 0));
+  const sonOnay = onaylar[onaylar.length - 1];
+  return sonuc(bugun, hedef, aksiyon, p.aksiyon_adi ?? 'Sunum', sonOnay ? `Son onay ${trTarih(sonOnay)}` : '');
+}
+
 // ---------------------------------------------------------------------------
 
 export function terminHesapla(
@@ -316,6 +354,7 @@ export function terminHesapla(
     case 'donemsel_rapor':
       return donemselRapor(p, kayit, bugun);
     case 'yillik_sabit_tarih':
+      if (p.onay_gerekli && p.ay && p.gun_no) return yillikOnayli(p, kayit, bugun);
       return yillikSabitTarih(p, kayit, bugun);
   }
 }

@@ -75,10 +75,49 @@ export function supabaseDepo(db: Istemci): Depo {
       return hataKontrol(await db.from('tesisler').select('*').eq('gt_kod', gtKod).maybeSingle());
     },
     async kisiler(tesisId) {
-      return hataKontrol(await db.from('kisiler').select('*').eq('tesis_id', tesisId).order('ad_soyad'));
+      let q = db.from('kisiler').select('*').order('ad_soyad');
+      if (tesisId) q = q.eq('tesis_id', tesisId);
+      return hataKontrol(await q);
     },
-    async turler() {
-      return hataKontrol(await db.from('yukumluluk_turleri').select('*').eq('aktif', true).order('sira'));
+    async turler(secenek = {}) {
+      let q = db.from('yukumluluk_turleri').select('*').order('sira');
+      if (!secenek.pasiflerDahil) q = q.eq('aktif', true);
+      return hataKontrol(await q);
+    },
+    async turEkle(t) {
+      const r = await db.from('yukumluluk_turleri').insert(t).select('id');
+      if (r.error) throw new Error(r.error.code === '23505' ? `“${t.kod}” kodu kullanılıyor` : `Veritabanı hatası: ${r.error.message}`);
+      if (!r.data?.length) throw new Error('Yükümlülük türlerini yalnızca yönetici ekleyebilir');
+      return (r.data[0] as { id: string }).id;
+    },
+    async turGuncelle(id, alanlar) {
+      const r = await db.from('yukumluluk_turleri').update(alanlar).eq('id', id).select('id');
+      if (r.error) throw new Error(`Veritabanı hatası: ${r.error.message}`);
+      if (!r.data?.length) throw new Error('Kuralları yalnızca yönetici değiştirebilir');
+    },
+    async isKartlari() {
+      return hataKontrol(await db.from('is_kartlari').select('id, tur_id, baslik, yapilacaklar, istenecekler, nereye, dikkat, sira').order('sira').order('baslik'));
+    },
+    async isKartiKaydet(k, id) {
+      const r = id
+        ? await db.from('is_kartlari').update(k).eq('id', id).select('id').single()
+        : await db.from('is_kartlari').insert(k).select('id').single();
+      if (r.error) throw new Error(`Veritabanı hatası: ${r.error.message}`);
+      return (r.data as { id: string }).id;
+    },
+    async isKartiSil(id) {
+      hataKontrol(await db.from('is_kartlari').delete().eq('id', id).select('id').single());
+    },
+    async gorusmeler(filtre = {}) {
+      let q = db.from('tesis_gorusmeleri').select('id, tesis_id, kisi_id, tarih, kanal, ozet, created_by').order('tarih', { ascending: false });
+      if (filtre.tesisId) q = q.eq('tesis_id', filtre.tesisId);
+      return hataKontrol(await q);
+    },
+    async gorusmeEkle(g) {
+      hataKontrol(await db.from('tesis_gorusmeleri').insert(g).select('id').single());
+    },
+    async gorusmeSil(id) {
+      hataKontrol(await db.from('tesis_gorusmeleri').delete().eq('id', id).select('id').single());
     },
     async yukumlulukler(tesisId) {
       let q = db.from('tesis_yukumlulukleri').select('*');

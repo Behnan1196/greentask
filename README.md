@@ -117,6 +117,8 @@ Ayrıntılar: [docs/KURAL_KATALOGU.md](docs/KURAL_KATALOGU.md).
 - [x] Benim İşlerim: tesis/yükümlülük sorumlusu, elle görev, kişisel takvim aboneliği (.ics)
 - [x] Toplantı & Görevler: gündem (devreden görevler + sistemin işaretledikleri), kararlar → görev, tutanak (.md), görev panosu
 - [ ] Müşteri hatırlatma e-postaları (onaylı gönderim)
+- [x] Kılavuz: kural kataloğu uygulamadan düzenlenir (yeni yükümlülük türü, uyarı aşamaları, kurum onayı bekleyen yıllık işler), her yükümlülük için iş kartı (ne yapılır, kimden ne istenir, nereye, dikkat) ve genel iş kartları
+- [x] İmzalı nüsha takibi, müşteri görüşmeleri ve "uzun süredir temas yok" hatırlatması, yetkili doğum günleri, saha ziyaretinde tesis dosyası kontrolü, tesise özel mevzuat bilgi notu (yazdırılır / PDF)
 - [ ] Belge tasnifi (büro bilgisayarında klasör tarayıcı → Supabase'e özet)
 - [x] Mevzuat: değişiklik takibi (etkilenen tesisler gruptan/koddan çözülür, tesis başına görev), kütüphane ve sektör grubu matrisi, tesis kartında uygulanan mevzuat
 - [x] Mevzuat: otomatik Resmî Gazete taraması → onay bekleyen öneriler ([docs/MEVZUAT_TARAMASI.md](docs/MEVZUAT_TARAMASI.md))

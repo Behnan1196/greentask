@@ -135,6 +135,29 @@ describe('kural tipleri', () => {
     expect(terminHesapla(t, aktif({ olaylar: gerceklesti('2027-03-20') }), {}, '2027-03-25').sonTarih).toBe('2028-03-31');
   });
 
+  it('onay gerektiren yıllık iş: sunuldu ama onay yoksa süreçte, onay gelince sonraki yıl', () => {
+    const t = { kod: 'cbs', ad: 'ÇBS beyanı', kural_tipi: 'yillik_sabit_tarih', parametreler: { ay: 3, gun_no: 31, hazirlik_gun: 30, onay_gerekli: true } } as YukumlulukTuru;
+    const sunuldu = { tarih: '2027-03-10', tur: 'sunuldu' as const };
+    const r1 = terminHesapla(t, aktif({ olaylar: [sunuldu] }), {}, '2027-04-25');
+    expect(r1.durum).toBe('surecte');
+    expect(r1.aciklama).toBe('Sunuldu (10.03.2027) · 46 gündür onay bekleniyor');
+    expect(r1.sonTarih).toBe('2027-03-31');
+    const eksik = [sunuldu, { tarih: '2027-04-02', tur: 'eksiklik_geldi' as const }];
+    expect(terminHesapla(t, aktif({ olaylar: eksik }), {}, '2027-04-25').aciklama).toMatch(/Eksiklik bildirildi \(02\.04\.2027\) · 23 gündür/);
+    // onay son tarihten sonra geldi: dönem kapanır, sonraki yıl hedeflenir (iki yıl atlanmaz)
+    const r2 = terminHesapla(t, aktif({ olaylar: [sunuldu, { tarih: '2027-04-20', tur: 'onaylandi' }] }), {}, '2027-04-25');
+    expect(r2.durum).toBe('planli');
+    expect(r2.sonTarih).toBe('2028-03-31');
+    // bu yılın sunumu erkenden yapılıp onaylandıysa bir sonraki yıl
+    const r3 = terminHesapla(t, aktif({ olaylar: [{ tarih: '2027-02-01', tur: 'sunuldu' }, { tarih: '2027-02-15', tur: 'onaylandi' }] }), {}, '2027-03-01');
+    expect(r3.sonTarih).toBe('2028-03-31');
+  });
+
+  it('süreçteki belgede son işlemden bu yana geçen gün yazılır', () => {
+    const r = terminHesapla(tur('eayp'), aktif({ gecerlilik_bitis: '2026-08-03', olaylar: [{ tarih: '2026-07-02', tur: 'sunuldu' }] }), {}, '2026-10-25');
+    expect(r.aciklama).toMatch(/115 gün önce/);
+  });
+
   it('muaf / veri eksik', () => {
     expect(terminHesapla(tur('egitim'), { durum: 'muaf' }, {}, '2026-10-25').durum).toBe('muaf');
     expect(terminHesapla(tur('emisyon'), aktif({}), {}, '2026-10-25').durum).toBe('veri_eksik');

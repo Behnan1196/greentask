@@ -3,7 +3,8 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { oturumuDogrula } from '@/lib/veri/depo';
-import type { BulguOnemi, ZiyaretDurumu } from '@/lib/veri/tipler';
+import { dosyaKalemleri } from '@/lib/saha/dosya';
+import type { BulguOnemi, DosyaDurumu, ZiyaretDurumu } from '@/lib/veri/tipler';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const TARIH = /^\d{4}-\d{2}-\d{2}$/;
@@ -103,5 +104,40 @@ export async function bulgudanGorev(form: FormData) {
 export async function dosyaSil(form: FormData) {
   const { depo } = await oturumuDogrula();
   await depo.dosyaSil(al(form, 'id', UUID, true)!);
+  yenile();
+}
+
+/** Tesis dosyası kontrolünü kaydeder; istenirse eksik / imzasız belgeleri bulgu olarak ekler. */
+export async function dosyaKontroluKaydet(form: FormData) {
+  const { depo } = await oturumuDogrula();
+  const id = al(form, 'id', UUID, true)!;
+  const z = await depo.ziyaret(id);
+  if (!z) throw new Error('Ziyaret bulunamadı');
+  const [kayitlar, turler] = await Promise.all([depo.yukumlulukler(z.tesis_id), depo.turler()]);
+  const kalemler = dosyaKalemleri(kayitlar, turler);
+  const kontrol: Record<string, DosyaDurumu> = {};
+  for (const k of kalemler) {
+    const v = String(form.get(`dk_${k.id}`) ?? '');
+    if (v === 'tam' || v === 'eksik' || v === 'imzasiz') kontrol[k.id] = v;
+  }
+  await depo.ziyaretGuncelle(id, { dosya_kontrolu: kontrol });
+  if (form.get('bulgu_ekle') === '1') {
+    const mevcut = new Set((await depo.bulgular([id])).map((b) => b.bulgu));
+    for (const k of kalemler) {
+      const d = kontrol[k.id];
+      if (d !== 'eksik' && d !== 'imzasiz') continue;
+      const bulgu = d === 'eksik' ? `Tesis dosyasında eksik: ${k.ad}` : `Tesis dosyasındaki belge imzasız: ${k.ad}`;
+      if (mevcut.has(bulgu)) continue;
+      await depo.bulguEkle({
+        ziyaret_id: id,
+        bulgu,
+        dayanak: null,
+        onem: 'orta',
+        duzeltici_faaliyet: d === 'eksik' ? 'Belgenin bir nüshası tesis dosyasına konulmalı' : 'Belgenin imzalı nüshası dosyaya konulmalı',
+        termin: null,
+        dosya_id: null,
+      });
+    }
+  }
   yenile();
 }

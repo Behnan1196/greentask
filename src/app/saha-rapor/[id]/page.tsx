@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { YazdirButonu } from '@/app/(uygulama)/saha/[id]/yukleyici';
 import { ONEM } from '@/lib/saha/durum';
+import { DOSYA_DURUMU, dosyaKalemleri } from '@/lib/saha/dosya';
 import { trTarih } from '@/lib/termin/tarih';
 import { oturumuDogrula } from '@/lib/veri/depo';
 
@@ -17,12 +18,16 @@ export default async function SahaRaporu(props: PageProps<'/saha-rapor/[id]'>) {
   if (!UUID.test(id)) notFound();
   const z = await depo.ziyaret(id);
   if (!z) notFound();
-  const [tesisler, ekip, dosyalar, bulgular] = await Promise.all([
-    depo.tesisler(),
+  const [tesisler, ekip, dosyalar, bulgular, kayitlar, turler] = await Promise.all([
+    depo.tesisler({ pasiflerDahil: true }),
     depo.kullanicilar(),
     depo.dosyalar(id),
     depo.bulgular([id]),
+    depo.yukumlulukler(z.tesis_id),
+    depo.turler(),
   ]);
+  const kontrol = z.dosya_kontrolu ?? {};
+  const kontrolEdilen = dosyaKalemleri(kayitlar, turler).filter((k) => kontrol[k.id]);
   const tesis = tesisler.find((t) => t.id === z.tesis_id)!;
   const ziyaretci = ekip.find((k) => k.id === z.ziyaretci_id)?.ad_soyad ?? '—';
   const fotolar = dosyalar.filter((d) => d.tur === 'foto');
@@ -70,6 +75,24 @@ export default async function SahaRaporu(props: PageProps<'/saha-rapor/[id]'>) {
         <section className="mt-6">
           <h2 className="mb-1 text-base font-semibold">Genel değerlendirme</h2>
           <p className="whitespace-pre-line">{z.rapor_ozeti}</p>
+        </section>
+      )}
+
+      {kontrolEdilen.length > 0 && (
+        <section className="mt-6 break-inside-avoid">
+          <h2 className="mb-2 text-base font-semibold">Tesis dosyası kontrolü</h2>
+          <table className="w-full border-collapse text-[12px]">
+            <tbody>
+              {kontrolEdilen.map((k) => (
+                <tr key={k.id} className="border-b border-cizgi">
+                  <td className="py-1 pr-4">{k.ad}</td>
+                  <td className={`w-32 py-1 font-semibold ${kontrol[k.id] === 'tam' ? 'text-yesil-koyu' : kontrol[k.id] === 'eksik' ? 'text-kirmizi' : 'text-turuncu'}`}>
+                    {DOSYA_DURUMU[kontrol[k.id]].ad}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </section>
       )}
 

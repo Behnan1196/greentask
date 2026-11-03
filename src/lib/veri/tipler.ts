@@ -36,6 +36,7 @@ export type Kisi = {
   eposta: string | null;
   imza_yetkisi: boolean;
   profil_notu: string | null;
+  dogum_gunu: string | null;
 };
 
 export type YukumlulukTuruSatiri = {
@@ -49,7 +50,36 @@ export type YukumlulukTuruSatiri = {
   mevzuat_dayanagi: string | null;
   aciklama: string | null;
   sira: number;
+  aktif: boolean;
 };
+
+export type YeniTur = Omit<YukumlulukTuruSatiri, 'id'>;
+
+/** İş kartı: bir yükümlülük türünün (ya da genel bir işin) nasıl yapıldığı. */
+export type IsKarti = {
+  id: string;
+  tur_id: string | null;
+  baslik: string;
+  yapilacaklar: string | null;
+  istenecekler: string | null;
+  nereye: string | null;
+  dikkat: string | null;
+  sira: number;
+};
+
+export type GorusmeKanali = 'telefon' | 'eposta' | 'yuz_yuze' | 'diger';
+
+export type Gorusme = {
+  id: string;
+  tesis_id: string;
+  kisi_id: string | null;
+  tarih: string;
+  kanal: GorusmeKanali;
+  ozet: string;
+  created_by: string | null;
+};
+
+export type DosyaDurumu = 'tam' | 'eksik' | 'imzasiz';
 
 export type OlaySatiri = {
   id: string;
@@ -87,6 +117,7 @@ export type MevzuatDegisikligi = {
   /** oneri: otomatik taramadan geldi, onay bekliyor · reddedildi: ilgisiz bulundu (yeniden önerilmez) */
   durum: 'oneri' | 'acik' | 'kapali' | 'reddedildi';
   mevzuat_id: string | null;
+  uyum_tarihi: string | null;
   kaynak: 'elle' | 'excel' | 'tarama';
   kaynak_url: string | null;
   tarama_notu: string | null;
@@ -193,6 +224,7 @@ export type SahaZiyareti = {
   amac: string | null;
   durum: ZiyaretDurumu;
   saha_notu: string | null;
+  dosya_kontrolu: Record<string, DosyaDurumu>;
   rapor_ozeti: string | null;
 };
 
@@ -321,8 +353,17 @@ export interface Depo {
   profilGuncelle(id: string, alanlar: Partial<Pick<Profil, 'ad_soyad' | 'rol' | 'aktif'>>): Promise<void>;
   sektorGrubuKaydet(g: SektorGrubu): Promise<void>;
   tesis(gtKod: string): Promise<Tesis | null>;
-  kisiler(tesisId: string): Promise<Kisi[]>;
-  turler(): Promise<YukumlulukTuruSatiri[]>;
+  /** tesisId verilmezse tüm aktif tesislerin kişileri. */
+  kisiler(tesisId?: string): Promise<Kisi[]>;
+  turler(secenek?: { pasiflerDahil?: boolean }): Promise<YukumlulukTuruSatiri[]>;
+  turEkle(t: YeniTur): Promise<string>;
+  turGuncelle(id: string, alanlar: Partial<YeniTur>): Promise<void>;
+  isKartlari(): Promise<IsKarti[]>;
+  isKartiKaydet(k: Omit<IsKarti, 'id'>, id?: string): Promise<string>;
+  isKartiSil(id: string): Promise<void>;
+  gorusmeler(filtre?: { tesisId?: string }): Promise<Gorusme[]>;
+  gorusmeEkle(g: Omit<Gorusme, 'id' | 'created_by'>): Promise<void>;
+  gorusmeSil(id: string): Promise<void>;
   yukumlulukler(tesisId?: string): Promise<TesisYukumlulukSatiri[]>;
   olaylar(tesisYukumlulukIdleri?: string[]): Promise<OlaySatiri[]>;
   mevzuatDegisiklikleri(): Promise<MevzuatDegisikligi[]>;

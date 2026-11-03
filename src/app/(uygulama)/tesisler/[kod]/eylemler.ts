@@ -3,11 +3,11 @@
 import { revalidatePath } from 'next/cache';
 import type { KayitDurumu, OlayTuru } from '@/lib/termin/motor';
 import { oturumuDogrula } from '@/lib/veri/depo';
-import type { YukumlulukGuncelleme } from '@/lib/veri/tipler';
+import type { GorusmeKanali, YukumlulukGuncelleme } from '@/lib/veri/tipler';
 import { kisiAlanlari, tesisAlanlari } from '../form-okuma';
 
 const DURUMLAR: KayitDurumu[] = ['aktif', 'muaf', 'kapsam_disi', 'beklemede'];
-const OLAYLAR: OlayTuru[] = ['gerceklesti', 'sunuldu', 'eksiklik_geldi', 'eksiklik_yanitlandi', 'onaylandi', 'not'];
+const OLAYLAR: OlayTuru[] = ['gerceklesti', 'sunuldu', 'eksiklik_geldi', 'eksiklik_yanitlandi', 'onaylandi', 'imzali_teslim', 'not'];
 const TARIH = /^\d{4}-\d{2}-\d{2}$/;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -135,5 +135,25 @@ export async function yukumlulukSil(form: FormData) {
   if (!UUID.test(id)) throw new Error('Geçersiz istek');
   if (form.get('onay') !== 'on') throw new Error('Silmek için onay kutusunu işaretleyin');
   await depo.yukumlulukSil(id);
+  yenile(form);
+}
+
+export async function gorusmeEkle(form: FormData) {
+  const { depo } = await oturumuDogrula();
+  const tesisId = String(form.get('tesis_id') ?? '');
+  const kisiId = String(form.get('kisi_id') ?? '');
+  const kanal = String(form.get('kanal') ?? 'telefon');
+  const tarih = tarihAlani(form, 'tarih');
+  const ozet = String(form.get('ozet') ?? '').trim();
+  if (!UUID.test(tesisId) || !tarih || !ozet || !['telefon', 'eposta', 'yuz_yuze', 'diger'].includes(kanal)) throw new Error('Tarih ve özet gerekli');
+  await depo.gorusmeEkle({ tesis_id: tesisId, kisi_id: UUID.test(kisiId) ? kisiId : null, tarih, kanal: kanal as GorusmeKanali, ozet: ozet.slice(0, 2000) });
+  yenile(form);
+}
+
+export async function gorusmeSil(form: FormData) {
+  const { depo } = await oturumuDogrula();
+  const id = String(form.get('id') ?? '');
+  if (!UUID.test(id)) throw new Error('Geçersiz istek');
+  await depo.gorusmeSil(id);
   yenile(form);
 }

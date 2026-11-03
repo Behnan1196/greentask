@@ -110,6 +110,11 @@ export function KisiAlanlariFormu({ k, zorunlu = true }: { k?: Kisi; zorunlu?: b
         Not (ziyarette işe yarayacak)
         <input name="profil_notu" defaultValue={k?.profil_notu ?? ''} className={GIRDI} />
       </label>
+      <label className="flex flex-col gap-1 text-sm">
+        Doğum günü
+        <input type="date" name="dogum_gunu" defaultValue={k?.dogum_gunu ?? ''} className={GIRDI} />
+        <span className="text-xs text-soluk">Yılı bilinmiyorsa herhangi bir yıl seçin; yalnızca gün ve ay kullanılır.</span>
+      </label>
       <label className="flex items-center gap-2 text-sm">
         <input type="checkbox" name="imza_yetkisi" defaultChecked={k?.imza_yetkisi} className="h-[18px] w-[18px] accent-yesil" />
         İmza yetkisi var

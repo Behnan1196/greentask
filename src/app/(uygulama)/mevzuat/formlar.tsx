@@ -55,6 +55,10 @@ export function DegisiklikAlanlari({ gruplar, mevzuatlar, d }: { gruplar: Sektor
         Etkilenen tesisler (ek)
         <input name="etkilenen_tesisler" defaultValue={d?.etkilenen_tesisler ?? ''} placeholder="Gruptan bağımsız tesisler: GT-001, GT-020… ya da “Tüm portföy”" className={GIRDI} />
       </label>
+      <label className="flex flex-col gap-1 text-sm">
+        Uyum için son tarih
+        <input type="date" name="uyum_tarihi" defaultValue={d?.uyum_tarihi ?? ''} className={GIRDI} />
+      </label>
       <label className="col-span-full flex flex-col gap-1 text-sm">
         Yapılacak
         <input name="aksiyon" defaultValue={d?.aksiyon ?? ''} placeholder="Örn. Sera gazı MRV raporu hazırlanması" className={GIRDI} />

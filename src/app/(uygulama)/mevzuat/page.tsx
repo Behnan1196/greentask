@@ -61,6 +61,11 @@ function DegisiklikKarti({
               <span className="font-medium">Yapılacak:</span> {d.aksiyon}
             </p>
           )}
+          {d.uyum_tarihi && (
+            <p className="text-sm">
+              <span className="font-medium">Uyum için son tarih:</span> {trTarih(d.uyum_tarihi)}
+            </p>
+          )}
           {d.tarama_notu && (
             <p className="text-sm text-murekkep-2">
               <span className="font-medium">Tarama notu:</span> {d.tarama_notu}
@@ -136,6 +141,21 @@ function DegisiklikKarti({
         </div>
       </div>
 
+      {!acikDegil && onerilen.length > 0 && (
+        <details className="rounded-lg bg-[#f7f8f5] px-4 py-3">
+          <summary className="cursor-pointer text-sm font-medium">Müşteri bilgi notu</summary>
+          <p className="mt-2 text-xs text-soluk">
+            Tesise özel, yazdırılabilir bilgi notu (firma unvanı, değişikliğin özeti, yapılacaklar, uyum tarihi). PDF olarak kaydedip e-postayla gönderebilirsiniz.
+          </p>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {onerilen.map(({ tesis }) => (
+              <a key={tesis.id} href={`/mevzuat-notu/${d.id}?tesis=${tesis.id}`} className="rounded-md border border-[#c9cec6] bg-white px-2 py-1 font-mono text-xs no-underline">
+                {tesis.gt_kod}
+              </a>
+            ))}
+          </div>
+        </details>
+      )}
       {!acikDegil && etkilenen.length > 0 && (
         <details className="rounded-lg bg-[#f7f8f5] px-4 py-3" open={vurgulu && !gorevler.length}>
           <summary className="cursor-pointer text-sm font-medium">Tesislere görev aç</summary>

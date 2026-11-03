@@ -57,3 +57,20 @@ export function terminleriHesapla(
 export const sorumlusu = (s: TerminSatiri) => s.kayit.sorumlu_id ?? s.tesis?.sorumlu_id ?? null;
 
 export const riskli = (s: TerminSatiri) => s.tur.cezai_risk === 'var' || s.tur.cezai_risk === 'yuksek';
+
+/**
+ * İmzalı nüsha takibi: türde "imzali_nusha" açıksa, son bir yıldaki sunuldu / gerçekleşti / onaylandı olayından
+ * sonra "imzalı nüsha teslim alındı" girilmemişse o olayın tarihini döner (uyarı gösterilir).
+ */
+export function imzaliNushaBekleyen(s: Pick<TerminSatiri, 'tur' | 'kayit' | 'olaylar'>, bugun: string): string | null {
+  const p = { ...s.tur.parametreler, ...(s.kayit.parametreler ?? {}) };
+  if (!p.imzali_nusha || s.kayit.durum !== 'aktif') return null;
+  const esik = new Date(Date.parse(bugun) - 365 * 864e5).toISOString().slice(0, 10);
+  const belge = s.olaylar
+    .filter((o) => (o.tur === 'sunuldu' || o.tur === 'gerceklesti' || o.tur === 'onaylandi') && o.tarih >= esik)
+    .map((o) => o.tarih)
+    .sort()
+    .pop();
+  if (!belge) return null;
+  return s.olaylar.some((o) => o.tur === 'imzali_teslim' && o.tarih >= belge) ? null : belge;
+}

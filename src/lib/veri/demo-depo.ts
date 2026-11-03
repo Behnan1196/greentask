@@ -34,7 +34,8 @@ const TESIS = ['id', 'gt_kod', 'kisa_ad', 'resmi_unvan', 'il', 'sinif', 'nace_ko
   'sozlesme_tarihi', 'sozlesme_kapsami', 'izin_lisans_konusu', 'mevzuat_notu', 'notlar', 'aktif', 'sorumlu_id'];
 const GOREV = "g.id, g.baslik, g.aciklama, g.sorumlu_id, to_char(g.son_tarih, 'YYYY-MM-DD') as son_tarih, g.durum, g.kaynak, g.tesis_id, g.toplanti_id, g.toplanti_maddesi_id, g.isletme_plani_id, g.plan_ogesi_id, g.mevzuat_degisikligi_id, g.created_at";
 const TOPLANTI = "id, to_char(tarih, 'YYYY-MM-DD') as tarih, baslik, notlar, durum, created_at";
-const ZIYARET = "id, tesis_id, to_char(tarih, 'YYYY-MM-DD') as tarih, ziyaretci_id, amac, durum, saha_notu, rapor_ozeti";
+const ZIYARET = "id, tesis_id, to_char(tarih, 'YYYY-MM-DD') as tarih, ziyaretci_id, amac, durum, saha_notu, rapor_ozeti, dosya_kontrolu";
+const KISI = "id, tesis_id, ad_soyad, gorev, sorumluluklar, telefon, eposta, imza_yetkisi, profil_notu, to_char(dogum_gunu, 'YYYY-MM-DD') as dogum_gunu";
 const BULGU = "id, ziyaret_id, bulgu, dayanak, onem, duzeltici_faaliyet, to_char(termin, 'YYYY-MM-DD') as termin, durum, gorev_id, dosya_id, sira";
 const PLAN = `p.id, p.baslik, p.durum, p.onayli_surum, to_char(p.onay_tarihi, 'YYYY-MM-DD') as onay_tarihi,
   to_char(p.sunum_tarihi, 'YYYY-MM-DD') as sunum_tarihi, p.hazirlayan_id, p.notlar, p.created_at,
@@ -83,8 +84,8 @@ export function demoDepo(): Depo {
     },
     async kisiEkle(tesisId, k) {
       await q(
-        'insert into kisiler (tesis_id, ad_soyad, gorev, sorumluluklar, telefon, eposta, imza_yetkisi, profil_notu) values ($1, $2, $3, $4, $5, $6, $7, $8)',
-        [tesisId, k.ad_soyad, k.gorev, k.sorumluluklar, k.telefon, k.eposta, k.imza_yetkisi, k.profil_notu],
+        'insert into kisiler (tesis_id, ad_soyad, gorev, sorumluluklar, telefon, eposta, imza_yetkisi, profil_notu, dogum_gunu) values ($1, $2, $3, $4, $5, $6, $7, $8, $9)',
+        [tesisId, k.ad_soyad, k.gorev, k.sorumluluklar, k.telefon, k.eposta, k.imza_yetkisi, k.profil_notu, k.dogum_gunu],
       );
     },
     async kisiGuncelle(id, k) {
@@ -123,10 +124,55 @@ export function demoDepo(): Depo {
       return (await q(`select ${tarihSql('t', TESIS)} from tesisler t where gt_kod = $1`, [gtKod]))[0] as never ?? null;
     },
     async kisiler(tesisId) {
-      return q('select * from kisiler where tesis_id = $1 order by ad_soyad', [tesisId]);
+      return tesisId
+        ? q(`select ${KISI} from kisiler where tesis_id = $1 order by ad_soyad`, [tesisId])
+        : q(`select ${KISI} from kisiler order by ad_soyad`);
     },
-    async turler() {
-      return q('select * from yukumluluk_turleri where aktif order by sira');
+    async turler(secenek = {}) {
+      return q(`select * from yukumluluk_turleri ${secenek.pasiflerDahil ? '' : 'where aktif'} order by sira`);
+    },
+    async turEkle(t) {
+      try {
+        const r = await q<{ id: string }>(
+          `insert into yukumluluk_turleri (kod, ad, kural_tipi, parametreler, cezai_risk, hedef_klasor, mevzuat_dayanagi, aciklama, sira, aktif)
+           values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) returning id`,
+          [t.kod, t.ad, t.kural_tipi, t.parametreler, t.cezai_risk, t.hedef_klasor, t.mevzuat_dayanagi, t.aciklama, t.sira, t.aktif],
+        );
+        return r[0].id;
+      } catch (e) {
+        if ((e as { code?: string }).code === '23505') throw new Error(`“${t.kod}” kodu kullanılıyor`);
+        throw e;
+      }
+    },
+    async turGuncelle(id, alanlar) {
+      await guncelle('yukumluluk_turleri', id, alanlar);
+    },
+    async isKartlari() {
+      return q('select id, tur_id, baslik, yapilacaklar, istenecekler, nereye, dikkat, sira from is_kartlari order by sira, baslik');
+    },
+    async isKartiKaydet(k, id) {
+      if (id) {
+        await guncelle('is_kartlari', id, k);
+        return id;
+      }
+      const r = await q<{ id: string }>(
+        'insert into is_kartlari (tur_id, baslik, yapilacaklar, istenecekler, nereye, dikkat, sira) values ($1, $2, $3, $4, $5, $6, $7) returning id',
+        [k.tur_id, k.baslik, k.yapilacaklar, k.istenecekler, k.nereye, k.dikkat, k.sira],
+      );
+      return r[0].id;
+    },
+    async isKartiSil(id) {
+      await q('delete from is_kartlari where id = $1', [id]);
+    },
+    async gorusmeler(filtre = {}) {
+      const s = "select id, tesis_id, kisi_id, to_char(tarih, 'YYYY-MM-DD') as tarih, kanal, ozet, created_by from tesis_gorusmeleri";
+      return filtre.tesisId ? q(`${s} where tesis_id = $1 order by tarih desc, created_at desc`, [filtre.tesisId]) : q(`${s} order by tarih desc`);
+    },
+    async gorusmeEkle(g) {
+      await q('insert into tesis_gorusmeleri (tesis_id, kisi_id, tarih, kanal, ozet) values ($1, $2, $3, $4, $5)', [g.tesis_id, g.kisi_id, g.tarih, g.kanal, g.ozet]);
+    },
+    async gorusmeSil(id) {
+      await q('delete from tesis_gorusmeleri where id = $1', [id]);
     },
     async yukumlulukler(tesisId) {
       const s = `select ${tarihSql('y', TY)} from tesis_yukumlulukleri y`;
@@ -138,14 +184,14 @@ export function demoDepo(): Depo {
     },
     async mevzuatDegisiklikleri() {
       return q(`select id, to_char(tespit_tarihi, 'YYYY-MM-DD') as tespit_tarihi, rg_metin, tur, ad, ozet, etkilenen_gruplar,
-                       etkilenen_tesisler, aksiyon, durum, mevzuat_id, kaynak, kaynak_url, tarama_notu from mevzuat_degisiklikleri order by tespit_tarihi desc, created_at desc`);
+                       etkilenen_tesisler, aksiyon, durum, mevzuat_id, to_char(uyum_tarihi, 'YYYY-MM-DD') as uyum_tarihi, kaynak, kaynak_url, tarama_notu from mevzuat_degisiklikleri order by tespit_tarihi desc, created_at desc`);
     },
     async degisiklikEkle(d) {
       return (
         await q<{ id: string }>(
-          `insert into mevzuat_degisiklikleri (tespit_tarihi, rg_metin, tur, ad, ozet, etkilenen_gruplar, etkilenen_tesisler, aksiyon, mevzuat_id)
-           values ($1, $2, $3, $4, $5, $6, $7, $8, $9) returning id`,
-          [d.tespit_tarihi, d.rg_metin, d.tur, d.ad, d.ozet, d.etkilenen_gruplar, d.etkilenen_tesisler, d.aksiyon, d.mevzuat_id],
+          `insert into mevzuat_degisiklikleri (tespit_tarihi, rg_metin, tur, ad, ozet, etkilenen_gruplar, etkilenen_tesisler, aksiyon, mevzuat_id, uyum_tarihi)
+           values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) returning id`,
+          [d.tespit_tarihi, d.rg_metin, d.tur, d.ad, d.ozet, d.etkilenen_gruplar, d.etkilenen_tesisler, d.aksiyon, d.mevzuat_id, d.uyum_tarihi],
         )
       )[0].id;
     },

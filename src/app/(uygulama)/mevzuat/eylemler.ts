@@ -41,6 +41,7 @@ function degisiklikAlanlari(form: FormData) {
     etkilenen_tesisler: al(form, 'etkilenen_tesisler'),
     aksiyon: al(form, 'aksiyon'),
     mevzuat_id: al(form, 'mevzuat_id', UUID),
+    uyum_tarihi: al(form, 'uyum_tarihi', TARIH),
   };
 }
 
