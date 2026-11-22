@@ -1,3 +1,4 @@
+import type { Faaliyet } from '@/lib/karbon/motor';
 import type { KayitDurumu, KuralTipi, OlayTuru, Parametreler } from '@/lib/termin/motor';
 
 export type CezaiRisk = 'yok' | 'dusuk' | 'var' | 'yuksek';
@@ -337,6 +338,58 @@ export type TakvimVerisi = {
 };
 
 /** Veri erişim katmanı: Supabase (gerçek) ve yerel Postgres (yalnızca geliştirme/demo) aynı arayüzü uygular. */
+export type SinirYaklasimi = 'operasyonel_kontrol' | 'finansal_kontrol' | 'hisse_payi';
+
+export type KarbonEnvanteri = {
+  id: string;
+  tesis_id: string;
+  yil: number;
+  baz_yil: number | null;
+  baslik: string;
+  sinir_yaklasimi: SinirYaklasimi;
+  sinir_aciklamasi: string | null;
+  haric_tutulanlar: string | null;
+  gwp: 'AR5' | 'AR6';
+  yakit_wtt: boolean;
+  durum: 'taslak' | 'kilitli';
+  kilit_sonucu: unknown | null;
+  kilit_zamani: string | null;
+  kilitleyen: string | null;
+  hazirlayan_id: string | null;
+  notlar: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type KarbonEnvanterAlanlari = Pick<
+  KarbonEnvanteri,
+  'tesis_id' | 'yil' | 'baz_yil' | 'baslik' | 'sinir_yaklasimi' | 'sinir_aciklamasi' | 'haric_tutulanlar' | 'gwp' | 'yakit_wtt' | 'hazirlayan_id' | 'notlar'
+>;
+
+/** Faaliyet verisi veritabanında kimliksiz saklanır; kimlik satırın id'sidir. */
+export type FaaliyetVerisi = Faaliyet extends infer F ? (F extends unknown ? Omit<F, 'id'> : never) : never;
+
+export type KarbonFaaliyetSatiri = {
+  id: string;
+  envanter_id: string;
+  veri: FaaliyetVerisi;
+  kanit: string | null;
+  sira: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type KarbonDenetimKaydi = {
+  id: number;
+  envanter_id: string;
+  zaman: string;
+  kullanici_id: string | null;
+  islem: string;
+  faaliyet_id: string | null;
+  onceki: Record<string, unknown> | null;
+  sonraki: Record<string, unknown> | null;
+};
+
 export interface Depo {
   kullanici(): Promise<Kullanici | null>;
   /** Varsayılan: yalnızca aktif tesisler. */
@@ -432,4 +485,17 @@ export interface Depo {
   ogeGuncelle(id: string, alanlar: Partial<Pick<PlanOgesiSatiri, 'durum' | 'notlar'>>): Promise<void>;
   planBulgulari(surumId: string): Promise<PlanBulgusu[]>;
   planBulgusuGuncelle(id: string, durum: PlanBulgusu['durum']): Promise<void>;
+  envanterler(filtre?: { tesisId?: string }): Promise<KarbonEnvanteri[]>;
+  envanter(id: string): Promise<KarbonEnvanteri | null>;
+  envanterOlustur(a: KarbonEnvanterAlanlari): Promise<string>;
+  envanterGuncelle(id: string, a: Partial<KarbonEnvanterAlanlari>): Promise<void>;
+  envanterSil(id: string): Promise<void>;
+  /** Sonucu dondurur; sonrasında faaliyet verisi değiştirilemez. */
+  envanterKilitle(id: string, sonuc: unknown, kullaniciId: string): Promise<void>;
+  envanterKilidiAc(id: string): Promise<void>;
+  faaliyetler(envanterId: string): Promise<KarbonFaaliyetSatiri[]>;
+  faaliyetEkle(envanterId: string, veri: FaaliyetVerisi, kanit: string | null): Promise<string>;
+  faaliyetGuncelle(id: string, veri: FaaliyetVerisi, kanit: string | null): Promise<void>;
+  faaliyetSil(id: string): Promise<void>;
+  denetimIzi(envanterId: string): Promise<KarbonDenetimKaydi[]>;
 }

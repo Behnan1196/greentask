@@ -377,6 +377,53 @@ export function supabaseDepo(db: Istemci): Depo {
     async planBulgusuGuncelle(id, durum) {
       hataKontrol(await db.from('plan_bulgulari').update({ durum }).eq('id', id).select('id').single());
     },
+    async envanterler(filtre = {}) {
+      let q = db.from('karbon_envanterleri').select('*').order('yil', { ascending: false }).order('baslik');
+      if (filtre.tesisId) q = q.eq('tesis_id', filtre.tesisId);
+      return hataKontrol(await q);
+    },
+    async envanter(id) {
+      return hataKontrol(await db.from('karbon_envanterleri').select('*').eq('id', id).maybeSingle());
+    },
+    async envanterOlustur(a) {
+      return (hataKontrol(await db.from('karbon_envanterleri').insert(a).select('id').single()) as { id: string }).id;
+    },
+    async envanterGuncelle(id, a) {
+      hataKontrol(await db.from('karbon_envanterleri').update(a).eq('id', id).select('id').single());
+    },
+    async envanterSil(id) {
+      hataKontrol(await db.from('karbon_envanterleri').delete().eq('id', id).select('id').single());
+    },
+    async envanterKilitle(id, sonuc, kullaniciId) {
+      hataKontrol(
+        await db
+          .from('karbon_envanterleri')
+          .update({ durum: 'kilitli', kilit_sonucu: sonuc, kilit_zamani: new Date().toISOString(), kilitleyen: kullaniciId })
+          .eq('id', id)
+          .select('id')
+          .single(),
+      );
+    },
+    async envanterKilidiAc(id) {
+      hataKontrol(
+        await db.from('karbon_envanterleri').update({ durum: 'taslak', kilit_sonucu: null, kilit_zamani: null, kilitleyen: null }).eq('id', id).select('id').single(),
+      );
+    },
+    async faaliyetler(envanterId) {
+      return hataKontrol(await db.from('karbon_faaliyetleri').select('*').eq('envanter_id', envanterId).order('sira').order('created_at'));
+    },
+    async faaliyetEkle(envanterId, veri, kanit) {
+      return (hataKontrol(await db.from('karbon_faaliyetleri').insert({ envanter_id: envanterId, veri, kanit }).select('id').single()) as { id: string }).id;
+    },
+    async faaliyetGuncelle(id, veri, kanit) {
+      hataKontrol(await db.from('karbon_faaliyetleri').update({ veri, kanit }).eq('id', id).select('id').single());
+    },
+    async faaliyetSil(id) {
+      hataKontrol(await db.from('karbon_faaliyetleri').delete().eq('id', id).select('id').single());
+    },
+    async denetimIzi(envanterId) {
+      return hataKontrol(await db.from('karbon_denetim_izi').select('*').eq('envanter_id', envanterId).order('zaman', { ascending: false }).limit(200));
+    },
     async gorevDurumu(id, durum) {
       const tamamlanma_zamani = durum === 'tamamlandi' ? new Date().toISOString() : null;
       hataKontrol(await db.from('gorevler').update({ durum, tamamlanma_zamani }).eq('id', id).select('id').single());

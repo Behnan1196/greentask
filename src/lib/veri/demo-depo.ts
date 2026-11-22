@@ -2,7 +2,7 @@ import 'server-only';
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { Pool } from 'pg';
-import type { Depo, Kullanici, TakvimVerisi } from './tipler';
+import type { Depo, KarbonEnvanteri, Kullanici, TakvimVerisi } from './tipler';
 
 // YALNIZCA GELİŞTİRME: Supabase hesabı olmadan, Excel'den üretilen seed ile yüklü yerel bir
 // Postgres üzerinde uygulamayı denemek için. Oturum açma yoktur; production'da asla kullanılmaz.
@@ -33,6 +33,8 @@ async function q<T>(sql: string, p: unknown[] = []): Promise<T[]> {
 const TESIS = ['id', 'gt_kod', 'kisa_ad', 'resmi_unvan', 'il', 'sinif', 'nace_kodlari', 'grup_kod', 'grup_notu', 'firma_grubu',
   'sozlesme_tarihi', 'sozlesme_kapsami', 'izin_lisans_konusu', 'mevzuat_notu', 'notlar', 'aktif', 'sorumlu_id'];
 const GOREV = "g.id, g.baslik, g.aciklama, g.sorumlu_id, to_char(g.son_tarih, 'YYYY-MM-DD') as son_tarih, g.durum, g.kaynak, g.tesis_id, g.toplanti_id, g.toplanti_maddesi_id, g.isletme_plani_id, g.plan_ogesi_id, g.mevzuat_degisikligi_id, g.created_at";
+const ENVANTER = `id, tesis_id, yil, baz_yil, baslik, sinir_yaklasimi, sinir_aciklamasi, haric_tutulanlar, gwp, yakit_wtt, durum, kilit_sonucu,
+  kilit_zamani, kilitleyen, hazirlayan_id, notlar, created_at, updated_at`;
 const TOPLANTI = "id, to_char(tarih, 'YYYY-MM-DD') as tarih, baslik, notlar, durum, created_at";
 const ZIYARET = "id, tesis_id, to_char(tarih, 'YYYY-MM-DD') as tarih, ziyaretci_id, amac, durum, saha_notu, rapor_ozeti, dosya_kontrolu";
 const KISI = "id, tesis_id, ad_soyad, gorev, sorumluluklar, telefon, eposta, imza_yetkisi, profil_notu, to_char(dogum_gunu, 'YYYY-MM-DD') as dogum_gunu";
@@ -476,6 +478,64 @@ export function demoDepo(): Depo {
         [k.id],
       );
       return r[0].anahtar;
+    },
+    async envanterler(filtre = {}) {
+      const s = `select ${ENVANTER} from karbon_envanterleri`;
+      return filtre.tesisId ? q(`${s} where tesis_id = $1 order by yil desc, baslik`, [filtre.tesisId]) : q(`${s} order by yil desc, baslik`);
+    },
+    async envanter(id) {
+      return (await q<KarbonEnvanteri>(`select ${ENVANTER} from karbon_envanterleri where id = $1`, [id]))[0] ?? null;
+    },
+    async envanterOlustur(a) {
+      const r = await q<{ id: string }>(
+        `insert into karbon_envanterleri (tesis_id, yil, baz_yil, baslik, sinir_yaklasimi, sinir_aciklamasi, haric_tutulanlar, gwp, yakit_wtt, hazirlayan_id, notlar)
+         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) returning id`,
+        [a.tesis_id, a.yil, a.baz_yil, a.baslik, a.sinir_yaklasimi, a.sinir_aciklamasi, a.haric_tutulanlar, a.gwp, a.yakit_wtt, a.hazirlayan_id, a.notlar],
+      );
+      return r[0].id;
+    },
+    async envanterGuncelle(id, a) {
+      const anahtarlar = Object.keys(a) as (keyof typeof a)[];
+      if (!anahtarlar.length) return;
+      await q(`update karbon_envanterleri set ${anahtarlar.map((k, i) => `${k} = $${i + 2}`).join(', ')} where id = $1`, [id, ...anahtarlar.map((k) => a[k])]);
+    },
+    async envanterSil(id) {
+      await q('delete from karbon_envanterleri where id = $1', [id]);
+    },
+    async envanterKilitle(id, sonuc, kullaniciId) {
+      await q("update karbon_envanterleri set durum = 'kilitli', kilit_sonucu = $2, kilit_zamani = now(), kilitleyen = $3 where id = $1", [id, JSON.stringify(sonuc), kullaniciId]);
+    },
+    async envanterKilidiAc(id) {
+      // Tetikleyici yönetici ister: demo kullanıcısının kimliğiyle aynı işlem içinde çalıştır.
+      const k = await demoKullanici();
+      const c = await pool().connect();
+      try {
+        await c.query('begin');
+        await c.query("select set_config('request.jwt.claim.sub', $1, true)", [k.id]);
+        await c.query("update karbon_envanterleri set durum = 'taslak', kilit_sonucu = null, kilit_zamani = null, kilitleyen = null where id = $1", [id]);
+        await c.query('commit');
+      } catch (e) {
+        await c.query('rollback');
+        throw e;
+      } finally {
+        c.release();
+      }
+    },
+    async faaliyetler(envanterId) {
+      return q('select id, envanter_id, veri, kanit, sira, created_at, updated_at from karbon_faaliyetleri where envanter_id = $1 order by sira, created_at', [envanterId]);
+    },
+    async faaliyetEkle(envanterId, veri, kanit) {
+      const r = await q<{ id: string }>('insert into karbon_faaliyetleri (envanter_id, veri, kanit) values ($1, $2, $3) returning id', [envanterId, JSON.stringify(veri), kanit]);
+      return r[0].id;
+    },
+    async faaliyetGuncelle(id, veri, kanit) {
+      await q('update karbon_faaliyetleri set veri = $2, kanit = $3 where id = $1', [id, JSON.stringify(veri), kanit]);
+    },
+    async faaliyetSil(id) {
+      await q('delete from karbon_faaliyetleri where id = $1', [id]);
+    },
+    async denetimIzi(envanterId) {
+      return q('select id::int as id, envanter_id, zaman, kullanici_id, islem, faaliyet_id, onceki, sonraki from karbon_denetim_izi where envanter_id = $1 order by zaman desc, id desc limit 200', [envanterId]);
     },
   };
 }

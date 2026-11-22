@@ -10,6 +10,7 @@ const BAGLANTILAR: { href: string; ad: string; ek?: string }[] = [
   { href: '/toplantilar', ad: 'Toplantı & Görevler', ek: '/gorevler' },
   { href: '/saha', ad: 'Saha Ziyaretleri' },
   { href: '/planlar', ad: 'İşletme Planları' },
+  { href: '/karbon', ad: 'Karbon Envanteri' },
   { href: '/mevzuat', ad: 'Mevzuat' },
   { href: '/kilavuz', ad: 'Kılavuz' },
   { href: '/ayarlar', ad: 'Ayarlar' },
